@@ -33,6 +33,8 @@ void setup() {
 
   // Zeit initialisieren
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+
+  pinMode(2, OUTPUT);
 }
 
 String getLocalTimeStr() {
@@ -99,6 +101,14 @@ void updateData() {
     }
     http.end();
   }
+  // LED Alarm Logik: Dauerlicht bei niedrigen Gebühren
+  if (fastestFee > 0 && fastestFee <= 5) {
+    digitalWrite(2, HIGH); // LED leuchtet dauerhaft
+    Serial.println("LED AN: Gebühren sind niedrig.");
+  } else {
+    digitalWrite(2, LOW);  // LED aus
+  }
+  
   lastUpdate = millis();
 }
 
@@ -121,7 +131,7 @@ void loop() {
   } 
   else if (displayMode == 2) { // BLOCKZEIT GROSS
     display.setFont(ArialMT_Plain_16);
-    display.drawString(0, 0, "Aktueller Block:");
+    display.drawString(0, 0, "Current block:");
     display.setFont(ArialMT_Plain_24);
     display.drawString(0, 18, "#" + String(blockHeight));
     display.setFont(ArialMT_Plain_10);
@@ -134,10 +144,11 @@ void loop() {
     display.drawString(0, 18, "Fast: " + String(fastestFee) + " sat/vB");
     display.drawString(0, 29, "Med:  " + String(halfHourFee) + " sat/vB");
     display.drawString(0, 40, "Slow: " + String(hourFee) + " sat/vB");
-    display.drawString(0, 50, "Time: " + currentTime);
+    display.drawString(0, 51, "Time: " + currentTime);
   }
 
   display.display();
+ 
   displayMode = (displayMode + 1) % 4; // Rotiert durch 4 Ansichten
-  delay(5000); 
+  delay(5000);
 }
