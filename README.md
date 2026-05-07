@@ -14,6 +14,8 @@ Ein multifunktionaler Bitcoin-Ticker für den ESP32 mit integriertem OLED-Displa
 - **Display**: Integriertes 0.96" OLED (SSD1306)
 - **Pins**: SDA (Pin 21), SCL (Pin 22), Onboard LED (Pin 2)
 
+![Vorschau des Bitcoin Tickers](ESP32-Bitcoin-Ticker.png)
+
 ## 📡 APIs & Bibliotheken
 - **Preise**: [CryptoCompare](https://cryptocompare.com)
 - **Blockchain-Daten**: [mempool.space](https://mempool.space)
