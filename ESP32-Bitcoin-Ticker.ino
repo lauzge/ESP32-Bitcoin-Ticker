@@ -6,8 +6,8 @@
 #include "SSD1306Wire.h"
 
 // Netzwerk-Daten
-const char* ssid = "VOSTNET";
-const char* password = "B6DeLKdcAWvRmjB";
+const char* ssid = "MEIN_WLAN";
+const char* password = "MEIN_PASSWORD";
 
 SSD1306Wire display(0x3c, SDA, SCL);
 
@@ -59,6 +59,7 @@ void updatePrices() {
       }
       priceUsd = doc["USD"];
       lastUpdate = millis();
+
     }
     http.end();
   }
@@ -76,17 +77,30 @@ void loop() {
   
   display.setFont(ArialMT_Plain_24);
   if (showEur) {
-    display.drawString(0, 18, String(priceEur, 2) + " €");
+    display.drawString(0, 18, String(priceEur, 0) + " EUR");
   } else {
     display.drawString(0, 18, "$ " + String(priceUsd, 2));
   }
 
-  // Tendenz und Prozentanzeige
+  // Tendenz, Prozentanzeige und Pfeile
   display.setFont(ArialMT_Plain_10);
-  String trend = (percentChange >= 0) ? "+" : "";
-  trend += String(percentChange, 4) + "%"; 
+  String trendSymbol = "";
+  String trendPrefix = "";
+
+  if (percentChange > 0) {
+    trendSymbol = " ^";   // Pfeil nach oben
+    trendPrefix = "+";
+  } else if (percentChange < 0) {
+    trendSymbol = " v";   // Kleines v als Pfeil nach unten
+    trendPrefix = "";     // Minus ist im Wert von percentChange schon enthalten
+  } else {
+    trendSymbol = " --";  // Gleichbleibend
+    trendPrefix = "";
+  }
+
+  String trendAnzeige = "Änderung: " + trendPrefix + String(percentChange, 4) + "%" + trendSymbol;
   
-  display.drawString(0, 48, "Änderung: " + trend);
+  display.drawString(0, 48, trendAnzeige);
   display.display();
 
   showEur = !showEur;
