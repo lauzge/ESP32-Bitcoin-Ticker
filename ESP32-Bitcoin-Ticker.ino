@@ -7,102 +7,114 @@
 
 // Netzwerk-Daten
 const char* ssid = "MEIN_WLAN";
-const char* password = "MEIN_PASSWORD";
+const char* password = "MEIN_PASSWORT";
 
 SSD1306Wire display(0x3c, SDA, SCL);
 
-// Variablen für Preise und Logik
-float priceEur = 0;
-float oldPriceEur = 0; // Speichert den vorherigen Wert
-float priceUsd = 0;
-float percentChange = 0;
+// Variablen für Preise und Mempool
+float priceEur = 0, oldPriceEur = 0, priceUsd = 0, percentChange = 0;
+int fastestFee = 0, halfHourFee = 0, hourFee = 0, blockHeight = 0;
 unsigned long lastUpdate = 0;
-bool showEur = true;
+int displayMode = 0; // 0=EUR, 1=USD, 2=Mempool
 
 
 void setup() {
   Serial.begin(115200);
   display.init();
   display.flipScreenVertically();
-  display.clear();
-  display.setFont(ArialMT_Plain_10);
-  display.drawString(0, 0, "Initialisiere WiFi...");
-  display.display();
- 
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) { delay(500); }
 }
 
-void updatePrices() {
+void updateData() {
   WiFiClientSecure client;
   client.setInsecure();
   HTTPClient http;
-  
-  // Fordert EUR und USD gleichzeitig an
-  String url = "https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD,EUR";
-  
-  if (http.begin(client, url)) {
-    http.addHeader("Accept-Encoding", "identity");
-    http.addHeader("User-Agent", "ESP32-Bitcoin-Ticker");
-    
+  http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+  http.setTimeout(10000);
+   
+  // 1. Preise abrufen (CryptoCompare)
+  if (http.begin(client, "https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD,EUR")) {
+    http.addHeader("User-Agent", "ESP32-Ticker");
     if (http.GET() == 200) {
-      StaticJsonDocument<256> doc;
+      StaticJsonDocument<512> doc;
       deserializeJson(doc, http.getString());
-      
       if (priceEur > 0) {
         oldPriceEur = priceEur;
         priceEur = doc["EUR"];
-        // Prozentformel: ((Neu - Alt) / Alt) * 100
         percentChange = ((priceEur - oldPriceEur) / oldPriceEur) * 100;
-      } else {
-        priceEur = doc["EUR"]; // Erster Lauf
-      }
+      } else { priceEur = doc["EUR"]; }
       priceUsd = doc["USD"];
-      lastUpdate = millis();
-
     }
     http.end();
   }
+
+  delay(500); // Kurze Pause für den Speicher
+
+  // 2. Mempool Gebühren
+  if (http.begin(client, "https://mempool.space/api/v1/fees/recommended")) {
+    http.addHeader("User-Agent", "ESP32-Ticker");
+    if (http.GET() == 200) {
+      StaticJsonDocument<512> doc;
+      deserializeJson(doc, http.getString());
+      fastestFee = doc["fastestFee"];
+      halfHourFee = doc["halfHourFee"];
+      hourFee = doc["hourFee"];
+    }
+    http.end();
+  }
+
+  delay(500); // Nochmals kurz warten
+
+  // 3. Blockhöhe (Erhöhte Robustheit)
+  if (http.begin(client, "https://mempool.space/api/blocks/tip/height")) {
+    http.addHeader("User-Agent", "ESP32-Ticker");
+    int httpCode = http.GET();
+    if (httpCode == 200) {
+      String payload = http.getString();
+      payload.trim(); // Entfernt unsichtbare Leerzeichen/Zeilenumbrüche
+      if (payload.length() > 0) {
+        blockHeight = payload.toInt();
+      }
+    }
+    http.end();
+  }
+  lastUpdate = millis();
 }
 
 void loop() {
-  // Update alle 30 Sekunden
-  if (millis() - lastUpdate > 30000 || lastUpdate == 0) {
-    updatePrices();
-  }
+  if (millis() - lastUpdate > 30000 || lastUpdate == 0) { updateData(); }
 
   display.clear();
-  display.setFont(ArialMT_Plain_16);
-  display.drawString(0, 0, "Bitcoin Live:");
   
-  display.setFont(ArialMT_Plain_24);
-  if (showEur) {
-    display.drawString(0, 18, String(priceEur, 0) + " EUR");
-  } else {
-    display.drawString(0, 18, "$ " + String(priceUsd, 2));
+  if (displayMode == 0 || displayMode == 1) {
+    display.setFont(ArialMT_Plain_16);
+    display.drawString(0, 0, "Bitcoin Live:");
+    display.setFont(ArialMT_Plain_24);
+    if (displayMode == 0) {
+      // Preis ohne Nachkommastellen für mehr Platz
+      display.drawString(0, 18, String(priceEur, 0) + " EUR");
+    } else {
+      display.drawString(0, 18, "$ " + String(priceUsd, 2));
+    }
+    display.setFont(ArialMT_Plain_10);
+    String trend = (percentChange >= 0) ? "+ " : "";
+    trend += String(percentChange, 4) + "% " + (percentChange >= 0 ? "^" : "v");
+    display.drawString(0, 48, "Chg: " + trend);
+  } 
+  else {
+    display.setFont(ArialMT_Plain_16);
+    display.drawString(0, 0, "Mempool/Block:");
+    
+    display.setFont(ArialMT_Plain_10);
+    // Wir rücken die Zeilen enger zusammen (17, 28, 39, 50)
+    display.drawString(0, 17, "Block: " + (blockHeight > 0 ? String(blockHeight) : "Lade..."));
+    display.drawString(0, 28, "Fast: " + String(fastestFee) + " sat/vB");
+    display.drawString(0, 39, "Med:  " + String(halfHourFee) + " sat/vB");
+    display.drawString(0, 50, "Slow: " + String(hourFee) + " sat/vB");
   }
 
-  // Tendenz, Prozentanzeige und Pfeile
-  display.setFont(ArialMT_Plain_10);
-  String trendSymbol = "";
-  String trendPrefix = "";
-
-  if (percentChange > 0) {
-    trendSymbol = " ^";   // Pfeil nach oben
-    trendPrefix = "+";
-  } else if (percentChange < 0) {
-    trendSymbol = " v";   // Kleines v als Pfeil nach unten
-    trendPrefix = "";     // Minus ist im Wert von percentChange schon enthalten
-  } else {
-    trendSymbol = " --";  // Gleichbleibend
-    trendPrefix = "";
-  }
-
-  String trendAnzeige = "Änderung: " + trendPrefix + String(percentChange, 4) + "%" + trendSymbol;
-  
-  display.drawString(0, 48, trendAnzeige);
   display.display();
-
-  showEur = !showEur;
+  displayMode = (displayMode + 1) % 3;
   delay(5000); 
 }
