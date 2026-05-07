@@ -1,41 +1,38 @@
-# 🚀 ESP32 Bitcoin Live Ticker
+# 🚀 ESP32 Bitcoin Live Ticker v1.1
 
-Ein kompakter Bitcoin-Preis-Ticker für den ESP32 mit integriertem OLED-Display (SSD1306). Die Daten werden in Echtzeit über die CryptoCompare API abgerufen und wechseln zwischen EUR und USD, inklusive einer prozentualen Tendenzanzeige.
+Ein multifunktionaler Bitcoin-Ticker für den ESP32 mit integriertem OLED-Display (SSD1306). Das Gerät wechselt automatisch zwischen Preis-Informationen, Netzwerk-Statistiken und einer großen Blockzeit-Anzeige.
 
-## ✨ Features
-- 💰 **Live-Preise**: Anzeige in Euro (€) und US-Dollar ($).
-- 📈 **Tendenzanzeige**: Berechnet die prozentuale Veränderung seit dem letzten Update.
-- 🔄 **Automatischer Wechsel**: Sanfter Wechsel der Ansichten alle 5 Sekunden.
-- ⚡ **Optimiert**: Nutzt HTTPS mit effizientem Speichermanagement (keine Memory Leaks).
-- 🛠️ **Einfach**: Kein API-Key für Basisabfragen erforderlich.
+## ✨ Neue Features in v1.1
+- 🕒 **NTP Uhrzeit**: Automatische Synchronisierung der Echtzeit (HH:MM).
+- ⛓️ **Große Blockzeit**: Exklusive Ansicht der aktuellen Blockhöhe.
+- 🚦 **Mempool-Alarm**: Die onboard LED leuchtet dauerhaft, wenn die Gebühren niedrig sind (<= 5 sat/vB).
+- 📊 **Detaillierter Mempool**: Anzeige der empfohlenen Gebühren (Fast, Medium, Slow) in sat/vB.
+- 📉 **Trend & Prozent**: Anzeige der Preisveränderung seit dem letzten Abruf.
 
 ## 🛠 Hardware
-- **Mikrocontroller**: ESP32 Wroom (z.B. DevKit V1)
+- **Board**: ESP32 Wroom (z.B. DevKit V1)
 - **Display**: Integriertes 0.96" OLED (SSD1306)
-- **Pins**: SDA an Pin 21, SCL an Pin 22 (Standard-I2C)
+- **Pins**: SDA (Pin 21), SCL (Pin 22), Onboard LED (Pin 2)
 
-## 📚 Benötigte Bibliotheken
-Folgende Bibliotheken müssen in der Arduino IDE installiert sein:
-1. `ESP8266 and ESP32 OLED driver for SSD1306 displays` (by ThingPulse)
-2. `ArduinoJson` (by Benoit Blanchon)
-3. `HTTPClient` & `WiFiClientSecure` (Standard ESP32 Core)
+## 📡 APIs & Bibliotheken
+- **Preise**: [CryptoCompare](https://cryptocompare.com)
+- **Blockchain-Daten**: [mempool.space](https://mempool.space)
+- **Bibliotheken**: 
+  - `SSD1306Wire` (ThingPulse)
+  - `ArduinoJson`
+  - `HTTPClient` & `WiFiClientSecure`
 
-## 🚀 Installation
-1. Klone dieses Repository:
-   ```bash
-   git clone https://github.com/lauzge/ESP32-Bitcoin-Ticker.git
-   ```
-2. Öffne die Datei `BitcoinTicker.ino` in der Arduino IDE.
-3. Trage deine WLAN-Daten ein:
-   ```cpp
-   const char* ssid = "DEIN_WLAN";
-   const char* password = "DEIN_PASSWORT";
-   ```
-4. Wähle dein Board aus (**DOIT ESP32 DEVKIT V1**) und klicke auf **Upload**.
+## 🚀 Installation & Setup
+1. Repository klonen.
+2. WLAN-Zugangsdaten in der `.ino` Datei anpassen.
+3. In der Arduino IDE das passende Board wählen und hochladen.
 
-## 🖥️ API-Referenz
-Dieses Projekt nutzt die kostenlose Schnittstelle von [CryptoCompare](https://cryptocompare.com). 
-Abfrage-Endpunkt: `/data/price?fsym=BTC&tsyms=EUR,USD`
+## 🖥️ Display-Rotation
+Das Display wechselt alle 5 Sekunden zwischen:
+1. **BTC/EUR** (inkl. Uhrzeit & %-Änderung)
+2. **BTC/USD** (inkl. Uhrzeit & %-Änderung)
+3. **Blockzeit** (Großansicht der Blockhöhe)
+4. **Mempool Fees** (sat/vB für verschiedene Prioritäten)
 
 ---
 Erstellt mit ❤️ für die Bitcoin-Community.
