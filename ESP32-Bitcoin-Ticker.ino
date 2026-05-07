@@ -4,6 +4,7 @@
 #include <ArduinoJson.h>
 #include <Wire.h>
 #include "SSD1306Wire.h"
+#include "time.h" // Für die Uhrzeit
 
 // Netzwerk-Daten
 const char* ssid = "MEIN_WLAN";
@@ -11,19 +12,36 @@ const char* password = "MEIN_PASSWORT";
 
 SSD1306Wire display(0x3c, SDA, SCL);
 
-// Variablen für Preise und Mempool
+// Variablen
 float priceEur = 0, oldPriceEur = 0, priceUsd = 0, percentChange = 0;
 int fastestFee = 0, halfHourFee = 0, hourFee = 0, blockHeight = 0;
 unsigned long lastUpdate = 0;
-int displayMode = 0; // 0=EUR, 1=USD, 2=Mempool
+int displayMode = 0; // 0=EUR, 1=USD, 2=Block, 3=Mempool
 
+// Zeit-Einstellungen (Zentral-Europa)
+const char* ntpServer = "pool.ntp.org";
+const long  gmtOffset_sec = 3600; 
+const int   daylightOffset_sec = 3600;
 
 void setup() {
   Serial.begin(115200);
   display.init();
   display.flipScreenVertically();
+  
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) { delay(500); }
+
+  // Zeit initialisieren
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+}
+
+String getLocalTimeStr() {
+  struct tm timeinfo;
+  if(!getLocalTime(&timeinfo)) return "00:00";
+  
+  char timeStringBuff[10]; // Wichtig: [10] reserviert den Platz für "HH:MM\0"
+  strftime(timeStringBuff, sizeof(timeStringBuff), "%H:%M", &timeinfo);
+  return String(timeStringBuff);
 }
 
 void updateData() {
@@ -32,10 +50,13 @@ void updateData() {
   HTTPClient http;
   http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
   http.setTimeout(10000);
-   
-  // 1. Preise abrufen (CryptoCompare)
+
+  int httpCode; // Hier deklarieren wir die Variable für die ganze Funktion!
+
+  // 1. Preise
   if (http.begin(client, "https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD,EUR")) {
     http.addHeader("User-Agent", "ESP32-Ticker");
+    httpCode = http.GET(); // Hier wird sie nur noch benutzt (ohne "int" davor)
     if (http.GET() == 200) {
       StaticJsonDocument<512> doc;
       deserializeJson(doc, http.getString());
@@ -48,13 +69,13 @@ void updateData() {
     }
     http.end();
   }
-
-  delay(500); // Kurze Pause für den Speicher
+  delay(300); // Kurze Pause für den Speicher
 
   // 2. Mempool Gebühren
   if (http.begin(client, "https://mempool.space/api/v1/fees/recommended")) {
     http.addHeader("User-Agent", "ESP32-Ticker");
-    if (http.GET() == 200) {
+    int httpCode = http.GET(); // Hier wird die Variable jetzt korrekt erstellt
+    if (httpCode == 200) {
       StaticJsonDocument<512> doc;
       deserializeJson(doc, http.getString());
       fastestFee = doc["fastestFee"];
@@ -63,13 +84,12 @@ void updateData() {
     }
     http.end();
   }
-
-  delay(500); // Nochmals kurz warten
+  delay(300); // Nochmals kurz warten
 
   // 3. Blockhöhe (Erhöhte Robustheit)
   if (http.begin(client, "https://mempool.space/api/blocks/tip/height")) {
     http.addHeader("User-Agent", "ESP32-Ticker");
-    int httpCode = http.GET();
+    httpCode = http.GET(); // Wiederverwendung
     if (httpCode == 200) {
       String payload = http.getString();
       payload.trim(); // Entfernt unsichtbare Leerzeichen/Zeilenumbrüche
@@ -86,35 +106,38 @@ void loop() {
   if (millis() - lastUpdate > 30000 || lastUpdate == 0) { updateData(); }
 
   display.clear();
-  
-  if (displayMode == 0 || displayMode == 1) {
+  String currentTime = getLocalTimeStr();
+
+  if (displayMode == 0 || displayMode == 1) { // PREISE
     display.setFont(ArialMT_Plain_16);
-    display.drawString(0, 0, "Bitcoin Live:");
+    display.drawString(0, 0, "Bitcoin Live " + currentTime);
     display.setFont(ArialMT_Plain_24);
-    if (displayMode == 0) {
-      // Preis ohne Nachkommastellen für mehr Platz
-      display.drawString(0, 18, String(priceEur, 0) + " EUR");
-    } else {
-      display.drawString(0, 18, "$ " + String(priceUsd, 2));
-    }
+    if (displayMode == 0) display.drawString(0, 18, String(priceEur, 0) + " EUR");
+    else display.drawString(0, 18, "$ " + String(priceUsd, 2));
     display.setFont(ArialMT_Plain_10);
     String trend = (percentChange >= 0) ? "+ " : "";
     trend += String(percentChange, 4) + "% " + (percentChange >= 0 ? "^" : "v");
     display.drawString(0, 48, "Chg: " + trend);
   } 
-  else {
+  else if (displayMode == 2) { // BLOCKZEIT GROSS
     display.setFont(ArialMT_Plain_16);
-    display.drawString(0, 0, "Mempool/Block:");
-    
+    display.drawString(0, 0, "Aktueller Block:");
+    display.setFont(ArialMT_Plain_24);
+    display.drawString(0, 18, "#" + String(blockHeight));
     display.setFont(ArialMT_Plain_10);
-    // Wir rücken die Zeilen enger zusammen (17, 28, 39, 50)
-    display.drawString(0, 17, "Block: " + (blockHeight > 0 ? String(blockHeight) : "Lade..."));
-    display.drawString(0, 28, "Fast: " + String(fastestFee) + " sat/vB");
-    display.drawString(0, 39, "Med:  " + String(halfHourFee) + " sat/vB");
-    display.drawString(0, 50, "Slow: " + String(hourFee) + " sat/vB");
+    display.drawString(0, 52, "Update: " + currentTime);
+  }
+  else { // MEMPOOL
+    display.setFont(ArialMT_Plain_16);
+    display.drawString(0, 0, "Mempool Fees:");
+    display.setFont(ArialMT_Plain_10);
+    display.drawString(0, 18, "Fast: " + String(fastestFee) + " sat/vB");
+    display.drawString(0, 29, "Med:  " + String(halfHourFee) + " sat/vB");
+    display.drawString(0, 40, "Slow: " + String(hourFee) + " sat/vB");
+    display.drawString(0, 50, "Time: " + currentTime);
   }
 
   display.display();
-  displayMode = (displayMode + 1) % 3;
+  displayMode = (displayMode + 1) % 4; // Rotiert durch 4 Ansichten
   delay(5000); 
 }
