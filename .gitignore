@@ -1,0 +1,16 @@
+# Arduino IDE temporäre Dateien
+build/
+bin/
+layout/
+*.elf
+*.bin
+*.hex
+
+# Lokale Konfigurationen (falls vorhanden)
+secrets.h
+
+# macOS Systemdateien
+.DS_Store
+
+# Windows Systemdateien
+Thumbs.db
