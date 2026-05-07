@@ -23,7 +23,7 @@ Folgende Bibliotheken müssen in der Arduino IDE installiert sein:
 ## 🚀 Installation
 1. Klone dieses Repository:
    ```bash
-   git clone https://github.com
+   git clone https://github.com/lauzge/ESP32-Bitcoin-Ticker.git
    ```
 2. Öffne die Datei `BitcoinTicker.ino` in der Arduino IDE.
 3. Trage deine WLAN-Daten ein:
