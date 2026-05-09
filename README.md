@@ -1,40 +1,62 @@
-# 🚀 ESP32 Bitcoin Live Ticker v1.1
+# 🚀 ESP32 Bitcoin Live Ticker - SD Edition
 
-Ein multifunktionaler Bitcoin-Ticker für den ESP32 mit integriertem OLED-Display (SSD1306). Das Gerät wechselt automatisch zwischen Preis-Informationen, Netzwerk-Statistiken und einer großen Blockzeit-Anzeige.
+Dieses Projekt zeigt Bitcoin-Echtzeitdaten auf einem OLED-Display an. Die Konfiguration erfolgt bequem über eine SD-Karte, sodass SSID und Passwort nicht im Code stehen müssen.
 
-## ✨ Neue Features in v1.1
-- 🕒 **NTP Uhrzeit**: Automatische Synchronisierung der Echtzeit (HH:MM).
-- ⛓️ **Große Blockzeit**: Exklusive Ansicht der aktuellen Blockhöhe.
-- 🚦 **Mempool-Alarm**: Die onboard LED leuchtet dauerhaft, wenn die Gebühren niedrig sind (<= 5 sat/vB).
-- 📊 **Detaillierter Mempool**: Anzeige der empfohlenen Gebühren (Fast, Medium, Slow) in sat/vB.
-- 📉 **Trend & Prozent**: Anzeige der Preisveränderung seit dem letzten Abruf.
+## 📂 Repository Struktur
 
-## 🛠 Hardware
-- **Board**: ESP32 Wroom (z.B. DevKit V1)
-- **Display**: Integriertes 0.96" OLED (SSD1306)
-- **Pins**: SDA (Pin 21), SCL (Pin 22), Onboard LED (Pin 2)
+Das Repository ist in zwei Hardware-Versionen unterteilt:
+
+### 1. [ESP32-Wroom + SD-Adapter](./ESP32-Wroom-SD)
+Für Standard ESP32-Boards mit externem SD-Kartenmodul.
+*   **Display:** Integriert oder I2C (SDA: 21, SCL: 22)
+*   **SD-Anbindung:** SPI-Modus (MISO: 19, MOSI: 23, SCK: 18, CS: 5)
+
+### 2. [ESP32-CAM-Version](./ESP32-CAM-SD)
+Optimiert für das ESP32-CAM Board mit integriertem SD-Slot.
+*   **Besonderheit:** Nutzt den SD_MMC Bus im 1-Bit Modus, um Pins für das Display frei zu halten.
+*   **Display-Pins:** SDA: GPIO 13, SCL: GPIO 12
+*   **Spannung:** Empfohlen wird der Anschluss des Displays an 5V, um Helligkeitsprobleme bei SD-Zugriffen zu vermeiden.
+
+---
 
 ![Vorschau des Bitcoin Tickers](ESP32-Bitcoin-Ticker.png)
 
-## 📡 APIs & Bibliotheken
-- **Preise**: [CryptoCompare](https://cryptocompare.com)
-- **Blockchain-Daten**: [mempool.space](https://mempool.space)
-- **Bibliotheken**: 
-  - `SSD1306Wire` (ThingPulse)
-  - `ArduinoJson`
-  - `HTTPClient` & `WiFiClientSecure`
+## ⚙️ Konfiguration (SD-Karte)
+Erstelle eine Datei namens `wifi.txt` im Hauptverzeichnis deiner MicroSD-Karte (FAT32 formatiert):
 
-## 🚀 Installation & Setup
-1. Repository klonen.
-2. WLAN-Zugangsdaten in der `.ino` Datei anpassen.
-3. In der Arduino IDE das passende Board wählen und hochladen.
+```text
+DEINE_WLAN_SSID
+DEIN_WLAN_PASSWORT
+```
 
-## 🖥️ Display-Rotation
-Das Display wechselt alle 5 Sekunden zwischen:
-1. **BTC/EUR** (inkl. Uhrzeit & %-Änderung)
-2. **BTC/USD** (inkl. Uhrzeit & %-Änderung)
-3. **Blockzeit** (Großansicht der Blockhöhe)
-4. **Mempool Fees** (sat/vB für verschiedene Prioritäten)
+## ✨ Features
+- 💰 **Preise:** Live-Kurse in EUR und USD von CryptoCompare.
+- 📉 **Trend:** Prozentuale Änderung und Tendenz-Pfeile (^ / v).
+- ⛓️ **Blockchain:** Große Anzeige der aktuellen Blockhöhe.
+- 🚦 **Mempool:** Aktuelle Gebühren (Fast/Med/Slow) von mempool.space.
+- 🕒 **NTP:** Automatische Uhrzeitsynchronisation.
+- 💡 **Low-Fee-Alert:** Onboard LED leuchtet bei Gebühren <= 5 sat/vB.
+
+## 📚 Benötigte Bibliotheken
+- `ESP8266 and ESP32 OLED driver for SSD1306`
+- `ArduinoJson`
+- `SD_MMC` & `HTTPClient` (Standard ESP32 Core)
+
+## 🔧 Board-Einstellungen (Arduino IDE)
+
+Stelle sicher, dass du im Boardverwalter das passende Board auswählst:
+
+### Für die Wroom-Version:
+*   **Board:** `DOIT ESP32 DEVKIT V1` (oder allgemein `ESP32 Dev Module`)
+*   **Upload Speed:** `115200`
+*   **Flash Frequency:** `80MHz`
+
+### Für die ESP32-CAM-Version:
+*   **Board:** `AI Thinker ESP32-CAM`
+*   **CPU Frequency:** `240MHz (WiFi/BT)`
+*   **Flash Mode:** `QIO`
+*   **Partition Scheme:** `Huge App (3MB No OTA/1MB SPIFFS)` (Wichtig, da der Code durch die Bibliotheken groß ist)
+*   **Anschluss:** Zum Flashen muss **GPIO 0 mit GND** verbunden werden!
 
 ---
 Erstellt mit ❤️ für die Bitcoin-Community.
