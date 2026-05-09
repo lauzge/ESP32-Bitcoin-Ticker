@@ -58,5 +58,7 @@ Stelle sicher, dass du im Boardverwalter das passende Board auswählst:
 *   **Partition Scheme:** `Huge App (3MB No OTA/1MB SPIFFS)` (Wichtig, da der Code durch die Bibliotheken groß ist)
 *   **Anschluss:** Zum Flashen muss **GPIO 0 mit GND** verbunden werden!
 
+Falls beimHochladen in den ESP32 der Speicherplatz nicht reicht, unter Werkzeuge das Partition Scheme auf Huge App umstellen.
+
 ---
 Erstellt mit ❤️ für die Bitcoin-Community.
