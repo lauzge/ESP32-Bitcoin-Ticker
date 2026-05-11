@@ -57,6 +57,13 @@ bool loadWiFiConfig() {
 
 void setup() {
   Serial.begin(115200);
+
+  // WICHTIG: Erst pinMode, dann digitalWrite
+  pinMode(2, OUTPUT); 
+  digitalWrite(2, HIGH); 
+  delay(1000); 
+  digitalWrite(2, LOW);
+
   display.init();
   display.flipScreenVertically();
 
@@ -77,9 +84,6 @@ void setup() {
   while (WiFi.status() != WL_CONNECTED) { delay(500); }
 
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-
-  pinMode(33, OUTPUT);
-  digitalWrite(33, HIGH); // Onboard-LED AUS
   
   display.clear();
   display.drawString(0, 0, "Verbunden!");
@@ -108,7 +112,7 @@ void updateData() {
   // 1. Preise
   if (http.begin(client, "https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD,EUR")) {
     http.addHeader("User-Agent", "ESP32-Ticker");
-    httpCode = http.GET(); // Hier wird sie nur noch benutzt (ohne "int" davor)
+    int httpCode = http.GET(); // Hier deklarieren wir die Variable nocheinmal für die ganze Funktion!
     if (http.GET() == 200) {
       StaticJsonDocument<512> doc;
       deserializeJson(doc, http.getString());
@@ -126,7 +130,7 @@ void updateData() {
   // 2. Mempool Gebühren
   if (http.begin(client, "https://mempool.space/api/v1/fees/recommended")) {
     http.addHeader("User-Agent", "ESP32-Ticker");
-    int httpCode = http.GET(); // Hier wird die Variable jetzt korrekt erstellt
+    httpCode = http.GET(); // Wiederverwendung
     if (httpCode == 200) {
       StaticJsonDocument<512> doc;
       deserializeJson(doc, http.getString());

@@ -61,15 +61,14 @@ void setup() {
   Serial.begin(115200);
   delay(1000); 
   
-  // I2C Pins 13 (SDA) und 12 (SCL)
-//  if (!Wire.begin(13, 12)) {
-//    Serial.println("I2C Bus Fehler!");
-//  }
-
+   // WICHTIG: Erst pinMode, dann digitalWrite
+  pinMode(33, OUTPUT); 
+  digitalWrite(33, LOW); 
+  delay(1000); 
+  digitalWrite(33, HIGH);
+ 
   display.init();
   display.flipScreenVertically();
-//  display.setContrast(255);      
-//  display.setBrightness(255);    
   
   display.clear();
   display.setFont(ArialMT_Plain_10);
@@ -103,8 +102,8 @@ void setup() {
 
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
 
-  pinMode(33, OUTPUT);
-  digitalWrite(33, HIGH); // Onboard-LED AUS
+ // pinMode(33, OUTPUT);
+ // digitalWrite(33, HIGH); // Onboard-LED AUS
   
   display.clear();
   display.drawString(0, 0, "Verbunden!");
@@ -151,7 +150,7 @@ void updateData() {
   // 2. Mempool Gebühren
   if (http.begin(client, "https://mempool.space/api/v1/fees/recommended")) {
     http.addHeader("User-Agent", "ESP32-Ticker");
-    int httpCode = http.GET(); // Hier wird die Variable jetzt korrekt erstellt
+    httpCode = http.GET(); // Hier wird die Variable jetzt korrekt erstellt
     if (httpCode == 200) {
       StaticJsonDocument<512> doc;
       deserializeJson(doc, http.getString());
@@ -178,10 +177,10 @@ void updateData() {
   }
   // LED Alarm Logik: Dauerlicht bei niedrigen Gebühren
   if (fastestFee > 0 && fastestFee <= 5) {
-    digitalWrite(2, HIGH); // LED leuchtet dauerhaft
+    digitalWrite(33, LOW); // LED leuchtet dauerhaft
     Serial.println("LED AN: Gebühren sind niedrig.");
   } else {
-    digitalWrite(2, LOW);  // LED aus
+    digitalWrite(33, HIGH);  // LED aus
   }
   
   lastUpdate = millis();
@@ -197,8 +196,8 @@ void loop() {
     display.setFont(ArialMT_Plain_16);
     display.drawString(0, 0, "Bitcoin Live " + currentTime);
     display.setFont(ArialMT_Plain_24);
-    if (displayMode == 0) display.drawString(0, 18, String(priceEur, 0) + " EUR");
-    else display.drawString(0, 18, "$ " + String(priceUsd, 2));
+    if (displayMode == 0) display.drawString(0, 18, String(priceEur, 0) + " EUR"); // Display ist zu kurz um Nachkommastellen anzuzeigen
+    else display.drawString(0, 18, "$ " + String(priceUsd, 2)); // Dollarzeichen erlaubt Nachkommastelln ^^ €-Zeichen wird nicht dargestellt
     display.setFont(ArialMT_Plain_10);
     String trend = (percentChange >= 0) ? "+ " : "";
     trend += String(percentChange, 4) + "% " + (percentChange >= 0 ? "^" : "v");
