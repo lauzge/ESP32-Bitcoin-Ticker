@@ -51,7 +51,7 @@ Stelle sicher, dass du im Boardverwalter das passende Board auswählst:
 *   **Upload Speed:** `115200`
 *   **Flash Frequency:** `80MHz`
 
-https://github.com/lauzge/ESP32-Bitcoin-Ticker/blob/main/ESP32-WROOM-Oled-Bitcoin-Ticker-SD-Card/ESP32-WROOM-Oled-Bitcoin-Ticker-SD-Card_Block.png
+![Vorschau des Bitcoin Tickers](./ESP32-WROOM-Oled-Bitcoin-Ticker-SD-Card/ESP32-WROOM-Oled-Bitcoin-Ticker-SD-Card_Block.png)
 
 ### Für die ESP32-CAM-Version:
 *   **Board:** `AI Thinker ESP32-CAM`
@@ -60,7 +60,7 @@ https://github.com/lauzge/ESP32-Bitcoin-Ticker/blob/main/ESP32-WROOM-Oled-Bitcoi
 *   **Partition Scheme:** `Huge App (3MB No OTA/1MB SPIFFS)` (Wichtig, da der Code durch die Bibliotheken groß ist)
 *   **Anschluss:** Zum Flashen muss **GPIO 0 mit GND** verbunden werden!
 
-https://github.com/lauzge/ESP32-Bitcoin-Ticker/blob/main/ESP32-CAM-Bitcoin-Ticker-SD-Card/ESP32-CAM-Bitcoin-Ticker-SD-Card_EUR.png
+![Vorschau des Bitcoin Tickers](./ESP32-CAM-Bitcoin-Ticker-SD-Card/ESP32-CAM-Bitcoin-Ticker-SD-Card_EUR.png)
 
 Falls beimHochladen in den ESP32 der Speicherplatz nicht reicht, unter Werkzeuge das Partition Scheme auf Huge App umstellen.
 
