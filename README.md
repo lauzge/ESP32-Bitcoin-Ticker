@@ -74,7 +74,7 @@ Stelle sicher, dass du im Boardverwalter das passende Board auswählst:
 *   **Upload Speed:** `115200`
 *   **Flash Frequency:** `80MHz`
 
-![Vorschau des Bitcoin Tickers](./ESP32-C3-Ext-Oled-Ext-SD-Cardreader-Bitcoin-Ticker/ESP32-C3-Ext-Oled-Ext-SD-Cardreader-Bitcoin-Ticker-EUR.png->
+![Vorschau des Bitcoin Tickers](./ESP32-C3-Ext-Oled-Ext-SD-Cardreader-Bitcoin-Ticker/ESP32-C3-Ext-Oled-Ext-SD-Cardreader-Bitcoin-Ticker-EUR.png)
 
 Falls beimHochladen in den ESP32 der Speicherplatz nicht reicht, unter Werkzeuge das Partition Scheme auf Huge App umstellen.
 
