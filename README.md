@@ -4,19 +4,24 @@ Dieses Projekt zeigt Bitcoin-Echtzeitdaten auf einem OLED-Display an. Die Konfig
 
 ## 📂 Repository Struktur
 
-Das Repository ist in zwei Hardware-Versionen unterteilt:
+Das Repository ist in drei Hardware-Versionen unterteilt:
 
-### 1. [ESP32-Wroom + SD-Adapter](./ESP32-Wroom-SD)
+### 1. [ESP32-Wroom + SD-Adapter](./ESP32-WROOM-Oled-Bitcoin-Ticker-SD-Card)
 Für Standard ESP32-Boards mit externem SD-Kartenmodul.
 *   **Display:** Integriert oder I2C (SDA: 21, SCL: 22)
 *   **SD-Anbindung:** SPI-Modus (MISO: 19, MOSI: 23, SCK: 18, CS: 5)
 
-### 2. [ESP32-CAM-Version](./ESP32-CAM-SD)
+### 2. [ESP32-CAM-Version](./ESP32-CAM-Bitcoin-Ticker-SD-Card)
 Optimiert für das ESP32-CAM Board mit integriertem SD-Slot.
 *   **Besonderheit:** Nutzt den SD_MMC Bus im 1-Bit Modus, um Pins für das Display frei zu halten.
 *   **Display-Pins:** SDA: GPIO 13, SCL: GPIO 12
 *   **Spannung:** Empfohlen wird der Anschluss des Displays an 5V, um Helligkeitsprobleme bei SD-Zugriffen zu vermeiden.
 
+### 3. [ESP32-C3-Version](./ESP32-C3-Ext-Oled-Ext-SD-Cardreader-Bitcoin-Ticker)
+Optimiert für das ESP32-C3-Board.
+*   **Display-Pins:** SDA: GPIO 10, SCL: GPIO 21
+*   **Spannung:** Empfohlen wird der Anschluss des Displays an 5V, um Helligkeitsprobleme bei SD-Zugriffen zu vermeiden.>
+                  3V Sind aber auch zulässig.>
 ---
 
 ![Vorschau des Bitcoin Tickers](ESP32-Bitcoin-Ticker.png)
@@ -40,7 +45,8 @@ DEIN_WLAN_PASSWORT
 ## 📚 Benötigte Bibliotheken
 - `ESP8266 and ESP32 OLED driver for SSD1306`
 - `ArduinoJson`
-- `SD_MMC` & `HTTPClient` (Standard ESP32 Core)
+- `SD_MMC` oder `SD` & `HTTPClient` (Standard ESP32 Core)
+- `WiFi`, `time`, `Wire`, `SPI` und `FS` (für WLAN, Uhrzeit, GPIO, Cardreader und Dateizugriff)
 
 ## 🔧 Board-Einstellungen (Arduino IDE)
 
@@ -61,6 +67,13 @@ Stelle sicher, dass du im Boardverwalter das passende Board auswählst:
 *   **Anschluss:** Zum Flashen muss **GPIO 0 mit GND** verbunden werden!
 
 ![Vorschau des Bitcoin Tickers](./ESP32-CAM-Bitcoin-Ticker-SD-Card/ESP32-CAM-Bitcoin-Ticker-SD-Card_EUR.png)
+
+### Für die C3-Version:
+*   **Board:** `ESP32C3 Dev Module`
+*   **Upload Speed:** `115200`
+*   **Flash Frequency:** `80MHz`
+
+![Vorschau des Bitcoin Tickers](./ESP32-C3-Ext-Oled-Ext-SD-Cardreader-Bitcoin-Ticker/ESP32-C3-Ext-Oled-Ext-SD-Cardreader-Bitcoin-Ticker-EUR.png->
 
 Falls beimHochladen in den ESP32 der Speicherplatz nicht reicht, unter Werkzeuge das Partition Scheme auf Huge App umstellen.
 
