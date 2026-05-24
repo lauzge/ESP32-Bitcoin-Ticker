@@ -11,6 +11,8 @@ Für Standard ESP32-Boards mit externem SD-Kartenmodul.
 *   **Display:** Integriert oder I2C (SDA: 21, SCL: 22)
 *   **SD-Anbindung:** SPI-Modus (MISO: 19, MOSI: 23, SCK: 18, CS: 5)
 
+![Vorschau des Bitcoin Tickers](ESP32-Bitcoin-Ticker.png)
+
 ### 2. [ESP32-CAM-Version](./ESP32-CAM-Bitcoin-Ticker-SD-Card)
 Optimiert für das ESP32-CAM Board mit integriertem SD-Slot.
 *   **Besonderheit:** Nutzt den SD_MMC Bus im 1-Bit Modus, um Pins für das Display frei zu halten.
@@ -24,7 +26,6 @@ Optimiert für das ESP32-C3-Board.
                   3V Sind aber auch zulässig.>
 ---
 
-![Vorschau des Bitcoin Tickers](ESP32-Bitcoin-Ticker.png)
 
 ## ⚙️ Konfiguration (SD-Karte)
 Erstelle eine Datei namens `wifi.txt` im Hauptverzeichnis deiner MicroSD-Karte (FAT32 formatiert):
