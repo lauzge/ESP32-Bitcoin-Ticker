@@ -4,7 +4,7 @@ Dieses Projekt zeigt Bitcoin-Echtzeitdaten auf einem OLED-Display an. Die Konfig
 
 ## 📂 Repository Struktur
 
-Das Repository ist in drei Hardware-Versionen unterteilt:
+Das Repository ist in vier spezialisierte Hardware-Versionen unterteilt:
 
 ### 1. [ESP32-Wroom + SD-Adapter](./ESP32-WROOM-Oled-Bitcoin-Ticker-SD-Card)
 Für Standard ESP32-Boards mit externem SD-Kartenmodul.
@@ -19,15 +19,21 @@ Optimiert für das ESP32-CAM Board mit integriertem SD-Slot.
 *   **Display-Pins:** SDA: GPIO 13, SCL: GPIO 12
 *   **Spannung:** Empfohlen wird der Anschluss des Displays an 5V, um Helligkeitsprobleme bei SD-Zugriffen zu vermeiden.
 
-### 3. [ESP32-C3-Version](./ESP32-C3-Ext-Oled-Ext-SD-Cardreader-Bitcoin-Ticker)
-Optimiert für das ESP32-C3-Board.
+### 3. [ESP32-C3-Version / SPI-SD](./ESP32-C3-Ext-Oled-Ext-SD-Cardreader-Bitcoin-Ticker)
+Optimiert für das stromsparende ESP32-C3-Board mit externem SD-Kartenleser.
 *   **Display-Pins:** SDA: GPIO 10, SCL: GPIO 21
-*   **Spannung:** Empfohlen wird der Anschluss des Displays an 5V, um Helligkeitsprobleme bei SD-Zugriffen zu vermeiden.>
-                  3V Sind aber auch zulässig.>
+*   **Spannung:** Empfohlen wird der Anschluss des Displays an 5V, um Helligkeitsprobleme bei SD-Zugriffen zu vermeiden. Ein Betrieb an 3.3V ist unter stabieler Stromversorgung zulässig.
+
 ---
 
+### 4. [ESP32-C3 Mini-Version (Autonomes Steckbrett)](./ESP32-C3-Mini-Ticker-72x40)
+Ultraminimale Standalone-Version ohne SD-Kartenleser für den Schreibtisch. Nutzt ein winziges 72x40 Pixel OLED-Display mit maximaler Informationsdichte.
+*   **Display-Pins:** SDA: GPIO 5, SCL: GPIO 6
+*   **Besonderheit:** Zeigt die NTP-Uhrzeit voll integriert auf allen 5 Rotationsseiten an.
 
-## ⚙️ Konfiguration (SD-Karte)
+---
+
+## ⚙️ Konfiguration (Für Versionen mit SD-Karte)
 Erstelle eine Datei namens `wifi.txt` im Hauptverzeichnis deiner MicroSD-Karte (FAT32 formatiert):
 
 ```text
@@ -36,18 +42,21 @@ DEIN_WLAN_PASSWORT
 ```
 
 ## ✨ Features
-- 💰 **Preise:** Live-Kurse in EUR und USD von CryptoCompare.
-- 📉 **Trend:** Prozentuale Änderung und Tendenz-Pfeile (^ / v).
-- ⛓️ **Blockchain:** Große Anzeige der aktuellen Blockhöhe.
-- 🚦 **Mempool:** Aktuelle Gebühren (Fast/Med/Slow) von mempool.space.
-- 🕒 **NTP:** Automatische Uhrzeitsynchronisation.
-- 💡 **Low-Fee-Alert:** Onboard LED leuchtet bei Gebühren <= 5 sat/vB.
+- 💰 **Preise:** Live-Kurse in EUR (ohne Nachkommastellen für optimalen Platz) und USD von CryptoCompare.
+- 📉 **Trend:** Prozentuale Änderung und Tendenz-Pfeile (+^ / v / --) seit dem letzten API-Abruf.
+- ⛓️ ***Blockchain:** Große, unübersehbare Anzeige der aktuellen Blockhöhe ("Bitcoin-Weltzeit").
+- 🚦 **Mempool:** Aktuelle, empfohlene On-Chain-Gebühren (Fast/Med/Slow) direkt von mempool.space.
+- 🕒 **NTP:** Automatische Uhrzeitsynchronisation im Hintergrund.
+- 💡 **Low-Fee-Alert:** Onboard LED leuchtet dauerhaft als Indikator auf, sobald die Gebühren unter <= 5 sat/vB fallen.
 
 ## 📚 Benötigte Bibliotheken
-- `ESP8266 and ESP32 OLED driver for SSD1306`
-- `ArduinoJson`
+Folgende Libraries müssen im Bibliotheksverwalter der Arduino IDE installiert sein:
+- `ESP8266 and ESP32 OLED driver for SSD1306` (Für Wroom, CAM und C3)
+- `U8g2` (Spezifisch für die 72x40 C3 Mini-Version)
+- `ArduinoJson` (Benoit Blanchon)
 - `SD_MMC` oder `SD` & `HTTPClient` (Standard ESP32 Core)
-- `WiFi`, `time`, `Wire`, `SPI` und `FS` (für WLAN, Uhrzeit, GPIO, Cardreader und Dateizugriff)
+- `WiFi`, `time`, `Wire`, `SPI` und `FS` (Integrierte Core-Bibliotheken)
+
 
 ## 🔧 Board-Einstellungen (Arduino IDE)
 
@@ -65,16 +74,20 @@ Stelle sicher, dass du im Boardverwalter das passende Board auswählst:
 *   **CPU Frequency:** `240MHz (WiFi/BT)`
 *   **Flash Mode:** `QIO`
 *   **Partition Scheme:** `Huge App (3MB No OTA/1MB SPIFFS)` (Wichtig, da der Code durch die Bibliotheken groß ist)
-*   **Anschluss:** Zum Flashen muss **GPIO 0 mit GND** verbunden werden!
+*   **Anschluss:** Zum Flashen muss **GPIO 0 mit GND** verbunden und ein Reset ausgeführt werden!
 
 ![Vorschau des Bitcoin Tickers](./ESP32-CAM-Bitcoin-Ticker-SD-Card/ESP32-CAM-Bitcoin-Ticker-SD-Card_EUR.png)
 
 ### Für die C3-Version:
-*   **Board:** `ESP32C3 Dev Module`
-*   **Upload Speed:** `115200`
+*   **Board:** `ESP32C3 Dev Module` (z.B. für den ESP32-C3 SuperMini)
+*   **USB CDC On Boot:** `Enabled` (Kritisch, da der C3 USB nativ in der CPU verwaltet. Sonst schlägt der Serielle Monitor fehl!)
+*   **Upload Speed:** `115200` (Bei Verbindungsabbruch auf `921600` anheben)
 *   **Flash Frequency:** `80MHz`
+*   **Partition Scheme:** Falls der Speicherplatz knapp wird, unter Werkzeuge auf `Huge App (3MB No OTA/1MB SPIFFS)` umstellen.
 
 ![Vorschau des Bitcoin Tickers](./ESP32-C3-Ext-Oled-Ext-SD-Cardreader-Bitcoin-Ticker/ESP32-C3-Ext-Oled-Ext-SD-Cardreader-Bitcoin-Ticker-EUR.png)
+
+![Vorschau des Bitcoin Tickers](./ESP32-C3-OLED-72x40/ESP32-C3-OLED-72x40-USD.png)
 
 Falls beimHochladen in den ESP32 der Speicherplatz nicht reicht, unter Werkzeuge das Partition Scheme auf Huge App umstellen.
 
