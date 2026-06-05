@@ -7,8 +7,8 @@
 #include "time.h" // Für die Uhrzeit
 
 // 1. WLAN-Zugangsdaten anpassen
-const char* ssid = "iPhone von Volker";
-const char* password = "Natur2000";
+const char* ssid = "MEIN_WLAN";
+const char* password = "MEIN_PASSWORT";
 
 // Onboard-LED für den Fee-Alarm beim C3 SuperMini
 #define ONBOARD_LED 8
