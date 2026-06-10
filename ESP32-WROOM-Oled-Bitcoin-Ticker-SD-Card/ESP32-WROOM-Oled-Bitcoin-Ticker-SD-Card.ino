@@ -9,10 +9,11 @@
 #include "SD.h"
 #include "SPI.h"
 
+#define ONBOARD_LED 2
+
 // Netzwerk-Daten (werden von SD geladen)
 String ssid = "";
 String password = "";
-String apiKey = ""; // NEU: Wird jetzt fehlerfrei befüllt!
 
 SSD1306Wire display(0x3c, SDA, SCL);
 
@@ -33,7 +34,6 @@ bool loadWiFiConfig() {
     return false;
   }
 
-  // FIX: Pfad wieder auf die unsichtbare Datei inklusive Punkt geändert!
   File file = SD.open("/.wifi.txt");
   if (!file) {
     Serial.println(".wifi.txt nicht gefunden!");
@@ -53,23 +53,17 @@ bool loadWiFiConfig() {
     password.replace("\n", "");
   }
 
-  if (file.available()) { 
-    apiKey = file.readStringUntil('\n'); 
-    apiKey.replace("\r", "");
-    apiKey.replace("\n", "");
-  }
-
   file.close();
-  return (ssid.length() > 0 && password.length() > 0 && apiKey.length() > 0);
+  return (ssid.length() > 0 && password.length() > 0);
 }
 
 void setup() {
   Serial.begin(115200);
 
-  pinMode(2, OUTPUT); 
-  digitalWrite(2, HIGH); 
+  pinMode(ONBOARD_LED, OUTPUT); 
+  digitalWrite(ONBOARD_LED, HIGH); 
   delay(1000); 
-  digitalWrite(2, LOW);
+  digitalWrite(ONBOARD_LED, LOW);
 
   display.init();
   display.flipScreenVertically();
@@ -82,7 +76,6 @@ void setup() {
     display.drawString(0, 15, "WiFi Daten geladen");
     display.display();
     
-    // Saubere Übergabe für SSIDs mit Leerzeichen
     const char* clean_ssid = ssid.c_str();
     const char* clean_password = password.c_str();
     WiFi.begin(clean_ssid, clean_password);
@@ -119,21 +112,24 @@ void updateData() {
 
   int httpCode;
 
-  // 1. Preise abrufen mit geladenem API-Key
-  String url = "https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD,EUR&api_key=" + apiKey;
-  if (http.begin(client, url)) {
+  // 1. Bitcoin-Preise direkt von mempool.space abrufen (Kein API-Key nötig)
+  if (http.begin(client, "https://mempool.space/api/v1/prices")) {
     http.addHeader("User-Agent", "ESP32-Ticker");
-    httpCode = http.GET(); // FIX: Nur einmal aufrufen, kein doppeltes int deklarieren!
+    httpCode = http.GET(); 
     
-    if (httpCode == 200) { // FIX: Nutzt das Ergebnis der obigen Variable
-      StaticJsonDocument<512> doc;
+    if (httpCode == 200) { 
+      JsonDocument doc; // V7-Standard
       deserializeJson(doc, http.getString());
-      if (priceEur > 0) {
-        oldPriceEur = priceEur;
-        priceEur = doc["EUR"];
-        percentChange = ((priceEur - oldPriceEur) / oldPriceEur) * 100;
-      } else { priceEur = doc["EUR"]; }
+      
+      priceEur = doc["EUR"];
       priceUsd = doc["USD"];
+      
+      if (priceEur > 0) {
+        if (oldPriceEur > 0) {
+          percentChange = ((priceEur - oldPriceEur) / oldPriceEur) * 100.0;
+        }
+        oldPriceEur = priceEur;
+      }
     }
     http.end();
   }
@@ -144,7 +140,7 @@ void updateData() {
     http.addHeader("User-Agent", "ESP32-Ticker");
     httpCode = http.GET(); 
     if (httpCode == 200) {
-      StaticJsonDocument<512> doc;
+      JsonDocument doc;
       deserializeJson(doc, http.getString());
       fastestFee = doc["fastestFee"];
       halfHourFee = doc["halfHourFee"];
@@ -170,10 +166,10 @@ void updateData() {
   
   // LED Alarm Logik (GPIO 2 Active High für Wroom)
   if (fastestFee > 0 && fastestFee <= 5) {
-    digitalWrite(2, HIGH); // LED AN
+    digitalWrite(ONBOARD_LED, HIGH); // LED AN
     Serial.println("LED AN: Gebühren sind niedrig.");
   } else {
-    digitalWrite(2, LOW);  // LED AUS
+    digitalWrite(ONBOARD_LED, LOW);  // LED AUS
   }
   
   lastUpdate = millis();

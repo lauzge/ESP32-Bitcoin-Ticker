@@ -6,10 +6,9 @@
 #include "SSD1306Wire.h"
 #include "time.h" // Für die Uhrzeit
 
-// Netzwerk-Daten & API-Key
+// Netzwerk-Daten
 const char* ssid = "MEIN_WLAN";
 const char* password = "MEIN_PASSWORT";
-const char* apiKey   = "MEIN_API_KEY"; // NEU: Dein CryptoCompare Key
 
 SSD1306Wire display(0x3c, SDA, SCL);
 
@@ -56,22 +55,24 @@ void updateData() {
 
   int httpCode;
 
-  // 1. Preise abrufen (Jetzt mit dynamischem API-Key)
-  String priceUrl = "https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD,EUR&api_key=" + String(apiKey);
-  
-  if (http.begin(client, priceUrl)) {
+  // 1. Bitcoin-Preise direkt von mempool.space abrufen (Kein API-Key nötig)
+  if (http.begin(client, "https://mempool.space/api/v1/prices")) {
     http.addHeader("User-Agent", "ESP32-Ticker");
-    httpCode = http.GET(); // Nur EINMAL aufrufen
+    httpCode = http.GET(); 
     
-    if (httpCode == 200) { // FIX: Variable prüfen statt erneut abzufragen
-      StaticJsonDocument<512> doc;
+    if (httpCode == 200) { 
+      JsonDocument doc; // V7-Standard
       deserializeJson(doc, http.getString());
-      if (priceEur > 0) {
-        oldPriceEur = priceEur;
-        priceEur = doc["EUR"];
-        percentChange = ((priceEur - oldPriceEur) / oldPriceEur) * 100;
-      } else { priceEur = doc["EUR"]; }
+      
+      priceEur = doc["EUR"];
       priceUsd = doc["USD"];
+      
+      if (priceEur > 0) {
+        if (oldPriceEur > 0) {
+          percentChange = ((priceEur - oldPriceEur) / oldPriceEur) * 100.0;
+        }
+        oldPriceEur = priceEur;
+      }
     }
     http.end();
   }

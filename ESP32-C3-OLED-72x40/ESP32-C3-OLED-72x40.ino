@@ -9,7 +9,6 @@
 // 1. WLAN-Zugangsdaten und API-Key anpassen
 const char* ssid     = "MEIN_WLAN";
 const char* password = "MEIN_PASSWORT";
-const char* apiKey   = "MEIN_API_KEY"; // NEU: Dein CryptoCompare Key
 
 // Onboard-LED für den Fee-Alarm beim C3 SuperMini
 #define ONBOARD_LED 8
@@ -17,9 +16,10 @@ const char* apiKey   = "MEIN_API_KEY"; // NEU: Dein CryptoCompare Key
 // Ihr funktionierender Display-Konstruktor (SDA=5, SCL=6)
 U8G2_SSD1306_72X40_ER_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, /* clock=*/ 6, /* data=*/ 5);
 
-// API-Endpunkte (Die Preis-URL bauen wir jetzt dynamisch mit dem Key zusammen)
+// API-Endpunkte
 const char* feeEndpoint   = "https://mempool.space/api/v1/fees/recommended";
 const char* blockEndpoint = "https://mempool.space/api/blocks/tip/height";
+const char* priceEndpoint = "https://mempool.space(api/v1/prices)";
 
 // Zeit-Einstellungen (Zentral-Europa)
 const char* ntpServer = "pool.ntp.org";
@@ -47,28 +47,29 @@ void updateAllData() {
   http.setTimeout(10000);
   http.addHeader("User-Agent", "ESP32-C3-MiniTicker");
 
-  // 1. Preise abrufen (Jetzt dynamisch mit API-Key)
-  String priceEndpoint = "https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD,EUR&api_key=" + String(apiKey);
-
-  if (http.begin(client, priceEndpoint)) {
+  // 1. NEU: Bitcoin-Preise direkt von mempool.space abrufen (Kein API-Key nötig!)
+  if (http.begin(client, "https://mempool.space/api/v1/prices")) {
     int httpCode = http.GET();
     if (httpCode == 200) {
-      JsonDocument doc;
+      JsonDocument doc; // V7-Standard
       deserializeJson(doc, http.getString());
-      if (priceEUR > 0) {
-        oldPriceEUR = priceEUR;
-        priceEUR = doc["EUR"];
-        percentChange = ((float)(priceEUR - oldPriceEUR) / oldPriceEUR) * 100.0;
-      } else {
-        priceEUR = doc["EUR"];
-      }
+      
+      // Mempool liefert EUR und USD direkt als Ganzzahlen (long)
+      priceEUR = doc["EUR"];
       priceUSD = doc["USD"];
+      
+      // Da mempool.space keine 24h-Prozentänderung mitsendet,
+      // berechnen wir den Trend wieder stabil selbst mit dem alten Wert:
+      if (oldPriceEUR > 0) {
+        percentChange = ((float)(priceEUR - oldPriceEUR) / oldPriceEUR) * 100.0;
+      }
+      oldPriceEUR = priceEUR; // Wert sichern für den nächsten Durchlauf
     }
     http.end();
   }
   delay(300);
 
-  // 2. Mempool Fees abrufen
+  // 2. Mempool Fees abrufen (Bleibt wie gewohnt)
   if (http.begin(client, feeEndpoint)) {
     int httpCode = http.GET();
     if (httpCode == 200) {
@@ -80,7 +81,7 @@ void updateAllData() {
   }
   delay(300);
 
-  // 3. Blockhöhe abrufen
+  // 3. Blockhöhe abrufen (Bleibt wie gewohnt)
   if (http.begin(client, blockEndpoint)) {
     int httpCode = http.GET();
     if (httpCode == 200) {
@@ -98,6 +99,7 @@ void updateAllData() {
     digitalWrite(ONBOARD_LED, HIGH);  // HIGH = LED AUS
   }
 }
+
 
 // Holt die aktuelle Uhrzeit im Format HH:MM
 String getLocalTimeStr() {

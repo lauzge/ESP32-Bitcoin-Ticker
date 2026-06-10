@@ -1,6 +1,6 @@
 # 🚀 ESP32 Bitcoin Live Ticker - SD Edition
 
-Dieses Projekt zeigt Bitcoin-Echtzeitdaten auf einem OLED-Display an. Die Konfiguration erfolgt bequem über eine SD-Karte, sodass SSID, Passwort und API-Key nicht im Code stehen müssen. Um die Informationen von CoinDesk laden zu können, muss du dich dort registrieren und einen API-Key erstellen. Den Key ladest du dir herunter und speicherst ihn als dritte Zeile in der versteckten Datei ".wifi.txt" auf deiner SD-Karte. Die Datei beginnt mit einem Punkt damit sie unte MacOS und Linux als Versteckt gekennzeichnet ist, für Windows musst du das dementsprechenden Flag setzen!
+Dieses Projekt zeigt Bitcoin-Echtzeitdaten auf einem OLED-Display an. Die Konfiguration erfolgt bequem über eine SD-Karte, sodass SSID und Passwort nicht im Code stehen müssen.
 
 ## 📂 Repository Struktur
 
@@ -38,7 +38,6 @@ Erstelle eine versteckte Datei namens `.wifi.txt` im Hauptverzeichnis deiner Mic
 Damit die Datei auch unter Windows versteckt ist muss das dementsprechende Flag gesetzt werden: Mit der rechten Maustaste auf die Datei klicken, dann auf Eigenschaften und in dem Eigenschftsfenster den Haken auf Versteckt setzen.
 1. Zeile: WLAN SSID (Leerzeichen im Namen sind erlaubt)
 2. Zeile: WLAN Passwort
-3. Zeile: CryptoCompare API-Key (Free Tier)
 
 
 ## ✨ Features

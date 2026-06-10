@@ -12,7 +12,6 @@
 // Netzwerk-Daten (werden von SD geladen)
 String ssid = "";
 String password = "";
-String apiKey = ""; // Wird nun korrekt aus Zeile 3 geladen!
 
 SSD1306Wire display(0x3c, 13, 12); // SDA=13, SCL=12
 
@@ -39,8 +38,7 @@ bool loadWiFiConfig() {
     return false;
   }
 
-  // FIX: Ersetzt .trim() durch präzises .replace(). Erlaubt alle Leerzeichen 
-  // und löscht unsichtbare Windows-Zeilenumbrüche (\r), die die Verbindung blockieren.
+  // Zeilenweise einlesen und von Windows-Steuerzeichen befreien
   if (file.available()) {
     ssid = file.readStringUntil('\n');
     ssid.replace("\r", "");
@@ -53,15 +51,8 @@ bool loadWiFiConfig() {
     password.replace("\n", "");
   }
 
-  // FIX: Liest jetzt die 3. Zeile der wifi.txt für den API-Key ein
-  if (file.available()) {
-    apiKey = file.readStringUntil('\n');
-    apiKey.replace("\r", "");
-    apiKey.replace("\n", "");
-  }
-
   file.close();
-  return (ssid.length() > 0 && password.length() > 0 && apiKey.length() > 0);
+  return (ssid.length() > 0 && password.length() > 0);
 }
 
 void setup() {
@@ -87,7 +78,6 @@ void setup() {
         display.drawString(0, 15, "WiFi Daten geladen");
         display.display();
         
-        // FIX: Saubere Übergabe für SSIDs mit Leerzeichen
         const char* clean_ssid = ssid.c_str();
         const char* clean_password = password.c_str();
         WiFi.begin(clean_ssid, clean_password);
@@ -132,21 +122,24 @@ void updateData() {
 
   int httpCode;
 
-  // 1. Preise (Nutzt jetzt die geladene apiKey Variable)
-  String url = "https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD,EUR&api_key=" + apiKey;
-  if (http.begin(client, url)) {
+  // 1. Bitcoin-Preise direkt von mempool.space abrufen (Kein API-Key nötig)
+  if (http.begin(client, "https://mempool.space(api/v1/prices")) {
     http.addHeader("User-Agent", "ESP32-Ticker");
-    httpCode = http.GET(); // Nur EINMAL aufrufen
+    httpCode = http.GET();
     
-    if (httpCode == 200) { // FIX: Prüft das Ergebnis, anstatt die Anfrage doppelt zu senden
-      StaticJsonDocument<512> doc;
+    if (httpCode == 200) {
+      JsonDocument doc; 
       deserializeJson(doc, http.getString());
-      if (priceEur > 0) {
-        oldPriceEur = priceEur;
-        priceEur = doc["EUR"];
-        percentChange = ((priceEur - oldPriceEur) / oldPriceEur) * 100;
-      } else { priceEur = doc["EUR"]; }
+      
+      priceEur = doc["EUR"];
       priceUsd = doc["USD"];
+      
+      if (priceEur > 0) {
+        if (oldPriceEur > 0) {
+          percentChange = ((priceEur - oldPriceEur) / oldPriceEur) * 100.0;
+        }
+        oldPriceEur = priceEur;
+      }
     }
     http.end();
   }
@@ -157,7 +150,7 @@ void updateData() {
     http.addHeader("User-Agent", "ESP32-Ticker");
     httpCode = http.GET(); 
     if (httpCode == 200) {
-      StaticJsonDocument<512> doc;
+      JsonDocument doc;
       deserializeJson(doc, http.getString());
       fastestFee = doc["fastestFee"];
       halfHourFee = doc["halfHourFee"];

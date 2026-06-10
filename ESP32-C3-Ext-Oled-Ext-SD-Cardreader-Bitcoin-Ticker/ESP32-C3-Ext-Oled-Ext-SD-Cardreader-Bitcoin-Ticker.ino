@@ -11,10 +11,9 @@
 
 #define ONBOARD_LED 8
 
-// Globale Strings als einfache Arrays/Objekte deklarieren, um Boot-Abstürze zu verhindern
+// Globale Strings
 String ssid;
 String password;
-String apiKey;
 
 // Display an C3 Pins (SDA=10, SCL=21)
 SSD1306Wire display(0x3c, 10, 21);
@@ -48,14 +47,13 @@ bool loadWiFiConfig() {
   // Zeilenweise einlesen und von Windows-Steuerzeichen befreien
   if (file.available()) { ssid = file.readStringUntil('\n'); ssid.replace("\r", ""); ssid.replace("\n", ""); }
   if (file.available()) { password = file.readStringUntil('\n'); password.replace("\r", ""); password.replace("\n", ""); }
-  if (file.available()) { apiKey = file.readStringUntil('\n'); apiKey.replace("\r", ""); apiKey.replace("\n", ""); }
 
   file.close();
-  return (ssid.length() > 0 && password.length() > 0 && apiKey.length() > 0);
+  // Validierung: apiKey muss nicht zwingend befüllt sein, da mempool.space keinen Key braucht!
+  return (ssid.length() > 0 && password.length() > 0);
 }
 
 void setup() {
-  // Absolut erste Aktion: Dem USB-CDC Controller Zeit geben, stabil zu werden
   delay(1000); 
   Serial.begin(115200);
   Serial.println("\n--- C3-Satellit Bootvorgang gestartet ---");
@@ -79,7 +77,11 @@ void setup() {
     display.display();
     
     Serial.println("WLAN-Daten erfolgreich gelesen.");
-    WiFi.begin(ssid.c_str(), password.c_str());
+    
+    // Saubere Zeiger-Übergabe für SSIDs mit Leerzeichen
+    const char* clean_ssid = ssid.c_str();
+    const char* clean_password = password.c_str();
+    WiFi.begin(clean_ssid, clean_password);
   } else {
     display.drawString(0, 15, "SD Fehler!");
     display.display();
@@ -109,26 +111,29 @@ void updateData() {
 
   int httpCode;
  
-  // 1. Preise abrufen
-  String priceUrl = "https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD,EUR&api_key=" + apiKey;
-  if (http.begin(client, priceUrl)) {
+  // 1. NEU: Bitcoin-Preise direkt von mempool.space abrufen (Kein API-Key nötig!)
+  if (http.begin(client, "https://mempool.space(api/v1/prices")) {
     http.addHeader("User-Agent", "ESP32-C3-Ticker");
     httpCode = http.GET(); 
     if (httpCode == 200) {
-      JsonDocument doc; // Universeller V7-Standard (Verhindert Abstürze)
+      JsonDocument doc; // V7-Standard
       deserializeJson(doc, http.getString());
-      if (priceEur > 0) {
-        oldPriceEur = priceEur;
-        priceEur = doc["EUR"];
-        percentChange = ((priceEur - oldPriceEur) / oldPriceEur) * 100;
-      } else { priceEur = doc["EUR"]; }
+      
+      // Werte zuweisen (Mempool liefert Ganzzahlen)
+      priceEur = doc["EUR"];
       priceUsd = doc["USD"];
+      
+      // Trendberechnung stabil im Code selbst ausführen
+      if (oldPriceEur > 0) {
+        percentChange = ((priceEur - oldPriceEur) / oldPriceEur) * 100.0;
+      }
+      oldPriceEur = priceEur; // Sichern für den nächsten Intervall
     }
     http.end();
   }
   delay(300);
 
-  // 2. Mempool
+  // 2. Mempool Gebühren
   if (http.begin(client, "https://mempool.space/api/v1/fees/recommended")) {
     http.addHeader("User-Agent", "ESP32-C3-Ticker");
     httpCode = http.GET(); 
@@ -155,7 +160,7 @@ void updateData() {
     http.end();
   }
 
-  // Fee Alarm LED Logik
+  // Fee Alarm LED Logik (Active Low)
   if (fastestFee > 0 && fastestFee <= 5) {
     digitalWrite(ONBOARD_LED, LOW);   // LOW = LED AN
   } else {
@@ -179,7 +184,7 @@ void loop() {
   display.clear();
   String currentTime = getLocalTimeStr();
 
-  if (displayMode == 0 || displayMode == 1) {
+  if (displayMode == 0 || displayMode == 1) { // 1. & 2. PREISE (EUR / USD)
     display.setFont(ArialMT_Plain_16);
     display.drawString(0, 0, "Bitcoin Live " + currentTime);
     display.setFont(ArialMT_Plain_24);
@@ -193,7 +198,7 @@ void loop() {
     trend += String(percentChange, 4) + "% " + (percentChange >= 0 ? "^" : "v");
     display.drawString(0, 48, "Chg: " + trend);
   } 
-  else if (displayMode == 2) {
+  else if (displayMode == 2) { // 3. BLOCKZEIT GROSS
     display.setFont(ArialMT_Plain_16);
     display.drawString(0, 0, "Current block:");
     display.setFont(ArialMT_Plain_24);
@@ -201,7 +206,7 @@ void loop() {
     display.setFont(ArialMT_Plain_10);
     display.drawString(0, 52, "Update: " + currentTime);
   }
-  else {
+  else { // 4. MEMPOOL FEES
     display.setFont(ArialMT_Plain_16);
     display.drawString(0, 0, "Mempool Fees:");
     display.setFont(ArialMT_Plain_10);
