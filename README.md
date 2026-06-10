@@ -33,13 +33,13 @@ Ultraminimale Standalone-Version ohne SD-Kartenleser für den Schreibtisch. Nutz
 
 ---
 
-## ⚙️ Konfiguration (Für Versionen mit SD-Karte)
-Erstelle eine Datei namens `wifi.txt` im Hauptverzeichnis deiner MicroSD-Karte (FAT32 formatiert):
+## ⚙️ Konfiguration (SD-Karte)
+Erstelle eine versteckte Datei namens `.wifi.txt` im Hauptverzeichnis deiner MicroSD-Karte (FAT32 formatiert):
+Damit die Datei auch unter Windows versteckt ist muss das dementsprechende Flag gesetzt werden: Mit der rechten Maustaste auf die Datei klicken, dann auf Eigenschaften und in dem Eigenschftsfenster den Haken auf Versteckt setzen.
+1. Zeile: WLAN SSID (Leerzeichen im Namen sind erlaubt)
+2. Zeile: WLAN Passwort
+3. Zeile: CryptoCompare API-Key (Free Tier)
 
-```text
-DEINE_WLAN_SSID
-DEIN_WLAN_PASSWORT
-```
 
 ## ✨ Features
 - 💰 **Preise:** Live-Kurse in EUR (ohne Nachkommastellen für optimalen Platz) und USD von CryptoCompare.
