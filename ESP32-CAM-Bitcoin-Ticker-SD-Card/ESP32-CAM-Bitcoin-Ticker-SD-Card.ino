@@ -9,13 +9,12 @@
 #include "SD_MMC.h"
 #include "SPI.h"
 
-// Netzwerk-Daten
-// Diese Variablen bleiben leer, da sie von der SD gefüllt werden
+// Netzwerk-Daten (werden von SD geladen)
 String ssid = "";
 String password = "";
+String apiKey = ""; // Wird nun korrekt aus Zeile 3 geladen!
 
-//SSD1306Wire display(0x3c, SDA, SCL);
-SSD1306Wire display(0x3c, 13, 12); // An ESP-CAM muss das Display auf Pin 12 und Pin 13 gesetzt werden
+SSD1306Wire display(0x3c, 13, 12); // SDA=13, SCL=12
 
 // Variablen
 float priceEur = 0, oldPriceEur = 0, priceUsd = 0, percentChange = 0;
@@ -29,43 +28,50 @@ const long  gmtOffset_sec = 3600;
 const int   daylightOffset_sec = 3600;
 
 bool loadWiFiConfig() {
-  // Für ESP32-CAM: Kein CS-Pin nötig, aber 1-Bit-Modus erzwingen (true)
   if (!SD_MMC.begin("/sdcard", true)) { 
     Serial.println("SD_MMC Fehler!");
     return false;
   }
 
-  // WICHTIG: Hier muss auch SD_MMC stehen, nicht SD!
-  File file = SD_MMC.open("/wifi.txt");
+  File file = SD_MMC.open("/.wifi.txt");
   if (!file) {
     Serial.println("Datei nicht gefunden!");
     return false;
   }
 
+  // FIX: Ersetzt .trim() durch präzises .replace(). Erlaubt alle Leerzeichen 
+  // und löscht unsichtbare Windows-Zeilenumbrüche (\r), die die Verbindung blockieren.
   if (file.available()) {
     ssid = file.readStringUntil('\n');
-    ssid.trim();
+    ssid.replace("\r", "");
+    ssid.replace("\n", "");
   }
   
   if (file.available()) {
     password = file.readStringUntil('\n');
-    password.trim();
+    password.replace("\r", "");
+    password.replace("\n", "");
+  }
+
+  // FIX: Liest jetzt die 3. Zeile der wifi.txt für den API-Key ein
+  if (file.available()) {
+    apiKey = file.readStringUntil('\n');
+    apiKey.replace("\r", "");
+    apiKey.replace("\n", "");
   }
 
   file.close();
-  return (ssid.length() > 0 && password.length() > 0);
+  return (ssid.length() > 0 && password.length() > 0 && apiKey.length() > 0);
 }
-
 
 void setup() {
   Serial.begin(115200);
   delay(1000); 
   
-   // WICHTIG: Erst pinMode, dann digitalWrite
   pinMode(33, OUTPUT); 
-  digitalWrite(33, LOW); 
+  digitalWrite(33, LOW); // LED AN (Test)
   delay(1000); 
-  digitalWrite(33, HIGH);
+  digitalWrite(33, HIGH); // LED AUS
  
   display.init();
   display.flipScreenVertically();
@@ -75,15 +81,16 @@ void setup() {
   display.drawString(0, 0, "Initialisiere...");
   display.display();
 
-  // SD_MMC einmalig im 1-Bit-Modus starten
   Serial.println("Lese SD-Karte...");
   if (SD_MMC.begin("/sdcard", true)) { 
-      // Jetzt die WiFi-Daten auslesen (Funktion sollte nur noch file.open machen)
       if (loadWiFiConfig()) {
         display.drawString(0, 15, "WiFi Daten geladen");
-        Serial.println("WiFi Daten geladen");
         display.display();
-        WiFi.begin(ssid.c_str(), password.c_str());
+        
+        // FIX: Saubere Übergabe für SSIDs mit Leerzeichen
+        const char* clean_ssid = ssid.c_str();
+        const char* clean_password = password.c_str();
+        WiFi.begin(clean_ssid, clean_password);
       } else {
         display.drawString(0, 15, "Datei-Fehler!");
         display.display();
@@ -94,16 +101,12 @@ void setup() {
       display.display();
   }
   
-  // Warten auf WiFi
   while (WiFi.status() != WL_CONNECTED) { 
     delay(500); 
     Serial.print(".");
   }
 
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-
- // pinMode(33, OUTPUT);
- // digitalWrite(33, HIGH); // Onboard-LED AUS
   
   display.clear();
   display.drawString(0, 0, "Verbunden!");
@@ -115,7 +118,7 @@ String getLocalTimeStr() {
   struct tm timeinfo;
   if(!getLocalTime(&timeinfo)) return "00:00";
   
-  char timeStringBuff[10]; // Wichtig: [10] reserviert den Platz für "HH:MM\0"
+  char timeStringBuff[10]; 
   strftime(timeStringBuff, sizeof(timeStringBuff), "%H:%M", &timeinfo);
   return String(timeStringBuff);
 }
@@ -127,13 +130,15 @@ void updateData() {
   http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
   http.setTimeout(10000);
 
-  int httpCode; // Hier deklarieren wir die Variable für die ganze Funktion!
+  int httpCode;
 
-  // 1. Preise
-  if (http.begin(client, "https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD,EUR")) {
+  // 1. Preise (Nutzt jetzt die geladene apiKey Variable)
+  String url = "https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD,EUR&api_key=" + apiKey;
+  if (http.begin(client, url)) {
     http.addHeader("User-Agent", "ESP32-Ticker");
-    httpCode = http.GET(); // Hier wird sie nur noch benutzt (ohne "int" davor)
-    if (http.GET() == 200) {
+    httpCode = http.GET(); // Nur EINMAL aufrufen
+    
+    if (httpCode == 200) { // FIX: Prüft das Ergebnis, anstatt die Anfrage doppelt zu senden
       StaticJsonDocument<512> doc;
       deserializeJson(doc, http.getString());
       if (priceEur > 0) {
@@ -145,12 +150,12 @@ void updateData() {
     }
     http.end();
   }
-  delay(300); // Kurze Pause für den Speicher
+  delay(300); 
 
   // 2. Mempool Gebühren
   if (http.begin(client, "https://mempool.space/api/v1/fees/recommended")) {
     http.addHeader("User-Agent", "ESP32-Ticker");
-    httpCode = http.GET(); // Hier wird die Variable jetzt korrekt erstellt
+    httpCode = http.GET(); 
     if (httpCode == 200) {
       StaticJsonDocument<512> doc;
       deserializeJson(doc, http.getString());
@@ -160,27 +165,28 @@ void updateData() {
     }
     http.end();
   }
-  delay(300); // Nochmals kurz warten
+  delay(300); 
 
-  // 3. Blockhöhe (Erhöhte Robustheit)
+  // 3. Blockhöhe
   if (http.begin(client, "https://mempool.space/api/blocks/tip/height")) {
     http.addHeader("User-Agent", "ESP32-Ticker");
-    httpCode = http.GET(); // Wiederverwendung
+    httpCode = http.GET(); 
     if (httpCode == 200) {
       String payload = http.getString();
-      payload.trim(); // Entfernt unsichtbare Leerzeichen/Zeilenumbrüche
+      payload.trim(); 
       if (payload.length() > 0) {
         blockHeight = payload.toInt();
       }
     }
     http.end();
   }
-  // LED Alarm Logik: Dauerlicht bei niedrigen Gebühren
+
+  // LED Alarm Logik (GPIO 33 Active Low für ESP32-CAM)
   if (fastestFee > 0 && fastestFee <= 5) {
-    digitalWrite(33, LOW); // LED leuchtet dauerhaft
+    digitalWrite(33, LOW); // LED AN
     Serial.println("LED AN: Gebühren sind niedrig.");
   } else {
-    digitalWrite(33, HIGH);  // LED aus
+    digitalWrite(33, HIGH);  // LED AUS
   }
   
   lastUpdate = millis();
@@ -192,18 +198,18 @@ void loop() {
   display.clear();
   String currentTime = getLocalTimeStr();
 
-  if (displayMode == 0 || displayMode == 1) { // PREISE
+  if (displayMode == 0 || displayMode == 1) { 
     display.setFont(ArialMT_Plain_16);
     display.drawString(0, 0, "Bitcoin Live " + currentTime);
     display.setFont(ArialMT_Plain_24);
-    if (displayMode == 0) display.drawString(0, 18, String(priceEur, 0) + " EUR"); // Display ist zu kurz um Nachkommastellen anzuzeigen
-    else display.drawString(0, 18, "$ " + String(priceUsd, 2)); // Dollarzeichen erlaubt Nachkommastelln ^^ €-Zeichen wird nicht dargestellt
+    if (displayMode == 0) display.drawString(0, 18, String(priceEur, 0) + " EUR"); 
+    else display.drawString(0, 18, "$ " + String(priceUsd, 2)); 
     display.setFont(ArialMT_Plain_10);
     String trend = (percentChange >= 0) ? "+ " : "";
     trend += String(percentChange, 4) + "% " + (percentChange >= 0 ? "^" : "v");
     display.drawString(0, 48, "Chg: " + trend);
   } 
-  else if (displayMode == 2) { // BLOCKZEIT GROSS
+  else if (displayMode == 2) { 
     display.setFont(ArialMT_Plain_16);
     display.drawString(0, 0, "Current block:");
     display.setFont(ArialMT_Plain_24);
@@ -211,7 +217,7 @@ void loop() {
     display.setFont(ArialMT_Plain_10);
     display.drawString(0, 52, "Update: " + currentTime);
   }
-  else { // MEMPOOL
+  else { 
     display.setFont(ArialMT_Plain_16);
     display.drawString(0, 0, "Mempool Fees:");
     display.setFont(ArialMT_Plain_10);
@@ -222,7 +228,6 @@ void loop() {
   }
 
   display.display();
- 
-  displayMode = (displayMode + 1) % 4; // Rotiert durch 4 Ansichten
+  displayMode = (displayMode + 1) % 4; 
   delay(5000);
 }

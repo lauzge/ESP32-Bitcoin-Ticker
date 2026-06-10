@@ -6,9 +6,10 @@
 #include <Wire.h>
 #include "time.h" // Für die Uhrzeit
 
-// 1. WLAN-Zugangsdaten anpassen
-const char* ssid = "MEIN_WLAN";
+// 1. WLAN-Zugangsdaten und API-Key anpassen
+const char* ssid     = "MEIN_WLAN";
 const char* password = "MEIN_PASSWORT";
+const char* apiKey   = "MEIN_API_KEY"; // NEU: Dein CryptoCompare Key
 
 // Onboard-LED für den Fee-Alarm beim C3 SuperMini
 #define ONBOARD_LED 8
@@ -16,8 +17,7 @@ const char* password = "MEIN_PASSWORT";
 // Ihr funktionierender Display-Konstruktor (SDA=5, SCL=6)
 U8G2_SSD1306_72X40_ER_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, /* clock=*/ 6, /* data=*/ 5);
 
-// API-Endpunkte
-const char* priceEndpoint = "https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD,EUR";
+// API-Endpunkte (Die Preis-URL bauen wir jetzt dynamisch mit dem Key zusammen)
 const char* feeEndpoint   = "https://mempool.space/api/v1/fees/recommended";
 const char* blockEndpoint = "https://mempool.space/api/blocks/tip/height";
 
@@ -47,7 +47,9 @@ void updateAllData() {
   http.setTimeout(10000);
   http.addHeader("User-Agent", "ESP32-C3-MiniTicker");
 
-  // 1. Preise abrufen
+  // 1. Preise abrufen (Jetzt dynamisch mit API-Key)
+  String priceEndpoint = "https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD,EUR&api_key=" + String(apiKey);
+
   if (http.begin(client, priceEndpoint)) {
     int httpCode = http.GET();
     if (httpCode == 200) {
@@ -66,7 +68,7 @@ void updateAllData() {
   }
   delay(300);
 
-  // 2. Mempool Fees abrufen (Ihre erweiterten Adressen!)
+  // 2. Mempool Fees abrufen
   if (http.begin(client, feeEndpoint)) {
     int httpCode = http.GET();
     if (httpCode == 200) {
@@ -181,13 +183,12 @@ void loop() {
     String timeStr = getLocalTimeStr();
 
     if (displayMode == 0 || displayMode == 1 || displayMode == 2) {
-      // Kopfzeile für die ersten 3 Screens (Uhrzeit rechts oben platziert)
       u8g2.setFont(u8g2_font_5x7_tf);
       if (displayMode == 0) u8g2.drawStr(0, 8, "BTC-EUR");
       else if (displayMode == 1) u8g2.drawStr(0, 8, "BTC-USD");
       else u8g2.drawStr(0, 8, "Change");
       
-      u8g2.drawStr(42, 8, timeStr.c_str()); // Uhrzeit bei X=42 bündig am rechten Rand
+      u8g2.drawStr(42, 8, timeStr.c_str()); 
       u8g2.drawHLine(0, 10, 72);
 
       if (displayMode == 0) {
@@ -209,19 +210,19 @@ void loop() {
         u8g2.drawStr(0, 28, chgStr.c_str());
       }
     }
-    else if (displayMode == 3) { // 4. BLOCKZEIT (Uhrzeit als 3. Zeile)
+    else if (displayMode == 3) { 
       u8g2.setFont(u8g2_font_5x7_tf);
       u8g2.drawStr(0, 8, "BLOCKHEIGHT");
       u8g2.drawHLine(0, 10, 72);
       
       u8g2.setFont(u8g2_font_6x12_tf);
       String blkStr = "#" + String(blockHeight);
-      u8g2.drawStr(0, 24, blkStr.c_str()); // Leicht nach oben geschoben
+      u8g2.drawStr(0, 24, blkStr.c_str()); 
       
-      u8g2.setFont(u8g2_font_4x6_tf); // Extra kleine Schrift für Zeile 3
+      u8g2.setFont(u8g2_font_4x6_tf); 
       u8g2.drawStr(0, 38, ("Zeit: " + timeStr).c_str());
     }
-    else if (displayMode == 4) { // 5. MEMPOOL FEES (Uhrzeit als 3. Zeile)
+    else if (displayMode == 4) { 
       u8g2.setFont(u8g2_font_5x7_tf);
       u8g2.drawStr(0, 8, "MEMPOOL FEE");
       u8g2.drawHLine(0, 10, 72);
@@ -230,7 +231,7 @@ void loop() {
       String feeStr = String(fastestFee) + " sat/vB";
       u8g2.drawStr(0, 24, feeStr.c_str());
       
-      u8g2.setFont(u8g2_font_4x6_tf); // Extra kleine Schrift für Zeile 3
+      u8g2.setFont(u8g2_font_4x6_tf); 
       u8g2.drawStr(0, 38, ("Zeit: " + timeStr).c_str());
     }
 

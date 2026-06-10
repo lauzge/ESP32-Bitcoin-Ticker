@@ -6,9 +6,10 @@
 #include "SSD1306Wire.h"
 #include "time.h" // Für die Uhrzeit
 
-// Netzwerk-Daten
+// Netzwerk-Daten & API-Key
 const char* ssid = "MEIN_WLAN";
 const char* password = "MEIN_PASSWORT";
+const char* apiKey   = "MEIN_API_KEY"; // NEU: Dein CryptoCompare Key
 
 SSD1306Wire display(0x3c, SDA, SCL);
 
@@ -53,13 +54,16 @@ void updateData() {
   http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
   http.setTimeout(10000);
 
-  int httpCode; // Hier deklarieren wir die Variable für die ganze Funktion!
+  int httpCode;
 
-  // 1. Preise
-  if (http.begin(client, "https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD,EUR")) {
+  // 1. Preise abrufen (Jetzt mit dynamischem API-Key)
+  String priceUrl = "https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD,EUR&api_key=" + String(apiKey);
+  
+  if (http.begin(client, priceUrl)) {
     http.addHeader("User-Agent", "ESP32-Ticker");
-    httpCode = http.GET(); // Hier wird sie nur noch benutzt (ohne "int" davor)
-    if (http.GET() == 200) {
+    httpCode = http.GET(); // Nur EINMAL aufrufen
+    
+    if (httpCode == 200) { // FIX: Variable prüfen statt erneut abzufragen
       StaticJsonDocument<512> doc;
       deserializeJson(doc, http.getString());
       if (priceEur > 0) {
@@ -76,7 +80,7 @@ void updateData() {
   // 2. Mempool Gebühren
   if (http.begin(client, "https://mempool.space/api/v1/fees/recommended")) {
     http.addHeader("User-Agent", "ESP32-Ticker");
-    int httpCode = http.GET(); // Hier wird die Variable jetzt korrekt erstellt
+    httpCode = http.GET(); 
     if (httpCode == 200) {
       StaticJsonDocument<512> doc;
       deserializeJson(doc, http.getString());
@@ -91,16 +95,17 @@ void updateData() {
   // 3. Blockhöhe (Erhöhte Robustheit)
   if (http.begin(client, "https://mempool.space/api/blocks/tip/height")) {
     http.addHeader("User-Agent", "ESP32-Ticker");
-    httpCode = http.GET(); // Wiederverwendung
+    httpCode = http.GET(); 
     if (httpCode == 200) {
       String payload = http.getString();
-      payload.trim(); // Entfernt unsichtbare Leerzeichen/Zeilenumbrüche
+      payload.trim(); 
       if (payload.length() > 0) {
         blockHeight = payload.toInt();
       }
     }
     http.end();
   }
+  
   // LED Alarm Logik: Dauerlicht bei niedrigen Gebühren
   if (fastestFee > 0 && fastestFee <= 5) {
     digitalWrite(2, HIGH); // LED leuchtet dauerhaft
@@ -149,6 +154,6 @@ void loop() {
 
   display.display();
  
-  displayMode = (displayMode + 1) % 4; // Rotiert durch 4 Ansichten
+  displayMode = (displayMode + 1) % 4; 
   delay(5000);
 }
