@@ -4,11 +4,8 @@
 #include <ArduinoJson.h>
 #include <U8g2lib.h>
 #include <Wire.h>
-#include "time.h" // Für die Uhrzeit
-
-// 1. WLAN-Zugangsdaten und API-Key anpassen
-const char* ssid     = "MEIN_WLAN";
-const char* password = "MEIN_PASSWORT";
+#include "time.h" 
+#include <WiFiManager.h> // Der Webinterface-WLAN-Manager
 
 // Onboard-LED für den Fee-Alarm beim C3 SuperMini
 #define ONBOARD_LED 8
@@ -19,7 +16,7 @@ U8G2_SSD1306_72X40_ER_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, /* clock
 // API-Endpunkte
 const char* feeEndpoint   = "https://mempool.space/api/v1/fees/recommended";
 const char* blockEndpoint = "https://mempool.space/api/blocks/tip/height";
-const char* priceEndpoint = "https://mempool.space(api/v1/prices)";
+const char* priceEndpoint = "https://mempool.space/api/v1/prices"; 
 
 // Zeit-Einstellungen (Zentral-Europa)
 const char* ntpServer = "pool.ntp.org";
@@ -34,9 +31,60 @@ float percentChange = 0;
 int fastestFee = 0;
 int blockHeight = 0;
 
+// Chart-Speicher für das kleine 72x40 Display (36 Punkte * 2 Pixel = 72 Pixel Breite)
+const int CHART_POINTS = 36;
+long priceHistory[CHART_POINTS];
+int historyCount = 0;
+
 unsigned long lastApiCheck = 0;
 const unsigned long apiInterval = 30000; 
-int displayMode = 0; // 0=EUR, 1=USD, 2=Chg, 3=Block, 4=Mempool
+int displayMode = 0; // 0=EUR, 1=USD, 2=Chg, 3=Block, 4=Mempool, 5=Chart
+
+void addPriceToHistory(long newPrice) {
+  if (historyCount < CHART_POINTS) {
+    priceHistory[historyCount] = newPrice;
+    historyCount++;
+  } else {
+    for (int i = 0; i < CHART_POINTS - 1; i++) {
+      priceHistory[i] = priceHistory[i + 1];
+    }
+    priceHistory[CHART_POINTS - 1] = newPrice;
+  }
+}
+
+void drawChart() {
+  if (historyCount < 2) return;
+
+  long minPrice = priceHistory[0];
+  long maxPrice = priceHistory[0];
+  for (int i = 1; i < historyCount; i++) {
+    if (priceHistory[i] < minPrice) minPrice = priceHistory[i];
+    if (priceHistory[i] > maxPrice) maxPrice = priceHistory[i];
+  }
+
+  long priceDelta = maxPrice - minPrice;
+  if (priceDelta == 0) priceDelta = 2; 
+
+  maxPrice += priceDelta * 0.05;
+  minPrice -= priceDelta * 0.05;
+  
+  float floatDelta = (float)(maxPrice - minPrice);
+  int chartHeight = 25;
+  int chartOffsetY = 39;
+
+  for (int i = 0; i < historyCount - 1; i++) {
+    int x1 = i * 2;
+    int x2 = (i + 1) * 2;
+
+    int y1 = chartOffsetY - (int)((float)(priceHistory[i] - minPrice) / floatDelta * chartHeight);
+    int y2 = chartOffsetY - (int)((float)(priceHistory[i + 1] - minPrice) / floatDelta * chartHeight);
+
+    if (y1 < 13) y1 = 13;
+    if (y2 < 13) y2 = 13;
+
+    u8g2.drawLine(x1, y1, x2, y2);
+  }
+}
 
 void updateAllData() {
   if (WiFi.status() != WL_CONNECTED) return;
@@ -47,29 +95,32 @@ void updateAllData() {
   http.setTimeout(10000);
   http.addHeader("User-Agent", "ESP32-C3-MiniTicker");
 
-  // 1. NEU: Bitcoin-Preise direkt von mempool.space abrufen (Kein API-Key nötig!)
-  if (http.begin(client, "https://mempool.space/api/v1/prices")) {
+  if (http.begin(client, priceEndpoint)) {
     int httpCode = http.GET();
     if (httpCode == 200) {
-      JsonDocument doc; // V7-Standard
+      JsonDocument doc; 
       deserializeJson(doc, http.getString());
       
-      // Mempool liefert EUR und USD direkt als Ganzzahlen (long)
-      priceEUR = doc["EUR"];
-      priceUSD = doc["USD"];
+      long currentEur = doc["EUR"].as<long>();
+      priceUSD = doc["USD"].as<long>();
       
-      // Da mempool.space keine 24h-Prozentänderung mitsendet,
-      // berechnen wir den Trend wieder stabil selbst mit dem alten Wert:
-      if (oldPriceEUR > 0) {
-        percentChange = ((float)(priceEUR - oldPriceEUR) / oldPriceEUR) * 100.0;
+      if (currentEur > 0) {
+        if (priceEUR > 0) {
+          if (currentEur != priceEUR) { 
+            oldPriceEUR = priceEUR;
+            percentChange = ((float)currentEur - (float)oldPriceEUR) / (float)oldPriceEUR * 100.0;
+          }
+        } else {
+          percentChange = 0.00;
+        }
+        priceEUR = currentEur; 
+        addPriceToHistory(priceEUR); 
       }
-      oldPriceEUR = priceEUR; // Wert sichern für den nächsten Durchlauf
     }
     http.end();
   }
   delay(300);
 
-  // 2. Mempool Fees abrufen (Bleibt wie gewohnt)
   if (http.begin(client, feeEndpoint)) {
     int httpCode = http.GET();
     if (httpCode == 200) {
@@ -81,7 +132,6 @@ void updateAllData() {
   }
   delay(300);
 
-  // 3. Blockhöhe abrufen (Bleibt wie gewohnt)
   if (http.begin(client, blockEndpoint)) {
     int httpCode = http.GET();
     if (httpCode == 200) {
@@ -92,16 +142,13 @@ void updateAllData() {
     http.end();
   }
 
-  // BLAUE LED Fee-Alarm Logik (GPIO 8, Active Low beim C3 SuperMini)
   if (fastestFee > 0 && fastestFee <= 5) {
-    digitalWrite(ONBOARD_LED, LOW);   // LOW = LED AN
+    digitalWrite(ONBOARD_LED, LOW);   
   } else {
-    digitalWrite(ONBOARD_LED, HIGH);  // HIGH = LED AUS
+    digitalWrite(ONBOARD_LED, HIGH);  
   }
 }
 
-
-// Holt die aktuelle Uhrzeit im Format HH:MM
 String getLocalTimeStr() {
   struct tm timeinfo;
   if(!getLocalTime(&timeinfo)) return "00:00";
@@ -115,6 +162,10 @@ void setup() {
   
   pinMode(ONBOARD_LED, OUTPUT);
   digitalWrite(ONBOARD_LED, HIGH); // Erstmal aus (Active Low)
+  
+  for (int i = 0; i < CHART_POINTS; i++) {
+    priceHistory[i] = 0;
+  }
 
   Wire.begin(5, 6); 
   u8g2.begin();
@@ -124,42 +175,48 @@ void setup() {
   u8g2.drawStr(0, 15, "WLAN...");
   u8g2.sendBuffer();
 
-  WiFi.disconnect(true);
-  delay(1000);
+  // WiFi Vorbereitung
   WiFi.mode(WIFI_STA);
-  WiFi.setSleep(false); 
+  WiFi.setSleep(false);
+  WiFi.setTxPower(WIFI_POWER_8_5dBm); // Sendeleistung drosseln gegen BOD
 
-  WiFi.begin(ssid, password);
-  WiFi.setTxPower(WIFI_POWER_8_5dBm); 
+  WiFiManager wm;
+  
+  // OPTIONAL: Wenn du die alten, gespeicherten WLAN-Daten löschen willst,
+  // entferne die zwei Schrägstriche vor der nächsten Zeile zum Testen einmalig:
+  // wm.resetSettings();
 
-  int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    attempts++;
-    
+
+  // Falls kein bekanntes WLAN gefunden wird, schaltet das kleine Display um:
+  wm.setAPCallback([](WiFiManager *myWiFiManager) {
+    u8g2.clearBuffer();
+    u8g2.setFont(u8g2_font_4x6_tf);
+    u8g2.drawStr(0, 6, "KEIN WLAN GEFUNDEN!");
+    u8g2.drawStr(0, 16, "Handy verbinden mit:");
+    u8g2.setFont(u8g2_font_5x7_tf);
+    u8g2.drawStr(0, 26, "C3-Ticker-AP");
+    u8g2.setFont(u8g2_font_4x6_tf);
+    u8g2.drawStr(0, 36, "Browser: 192.168.4.1");
+    u8g2.sendBuffer();
+  });
+
+  // Verbindungsversuch oder Portal oeffnen
+  if (!wm.autoConnect("C3-Ticker-AP")) {
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_5x7_tf);
-    u8g2.drawStr(0, 12, "Suche WiFi");
-    String dots = "Sec: " + String(attempts / 2);
-    u8g2.drawStr(0, 28, dots.c_str());
+    u8g2.drawStr(0, 20, "WM Fehler!");
     u8g2.sendBuffer();
-    
-    if (attempts > 60) {
-      WiFi.disconnect();
-      WiFi.begin(ssid, password);
-      WiFi.setTxPower(WIFI_POWER_8_5dBm);
-      attempts = 0;
-    }
+    delay(3000);
+    ESP.restart();
   }
   
   u8g2.clearBuffer();
+  u8g2.setFont(u8g2_font_6x10_tf);
   u8g2.drawStr(0, 15, "WLAN OK!");
   u8g2.sendBuffer();
   delay(1500);
 
-  // Zeit-Sync starten
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-  
   updateAllData();
 }
 
@@ -184,11 +241,12 @@ void loop() {
     u8g2.clearBuffer();
     String timeStr = getLocalTimeStr();
 
-    if (displayMode == 0 || displayMode == 1 || displayMode == 2) {
+    if (displayMode == 0 || displayMode == 1 || displayMode == 2 || displayMode == 5) {
       u8g2.setFont(u8g2_font_5x7_tf);
       if (displayMode == 0) u8g2.drawStr(0, 8, "BTC-EUR");
       else if (displayMode == 1) u8g2.drawStr(0, 8, "BTC-USD");
-      else u8g2.drawStr(0, 8, "Change");
+      else if (displayMode == 2) u8g2.drawStr(0, 8, "Change");
+      else u8g2.drawStr(0, 8, "Trend 18m"); 
       
       u8g2.drawStr(42, 8, timeStr.c_str()); 
       u8g2.drawHLine(0, 10, 72);
@@ -210,6 +268,9 @@ void loop() {
         String chgStr = String(percentChange, 2) + trend;
         u8g2.setFont(u8g2_font_6x12_tf); 
         u8g2.drawStr(0, 28, chgStr.c_str());
+      }
+      else if (displayMode == 5) {
+        drawChart(); 
       }
     }
     else if (displayMode == 3) { 
@@ -238,7 +299,13 @@ void loop() {
     }
 
     u8g2.sendBuffer();
-    displayMode = (displayMode + 1) % 5; 
+    
+    if (historyCount >= CHART_POINTS) {
+      displayMode = (displayMode + 1) % 6; 
+    } else {
+      displayMode = (displayMode + 1) % 5; 
+    }
+    
     delay(5000); 
     
   } else {

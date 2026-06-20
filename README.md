@@ -1,94 +1,63 @@
-# 🚀 ESP32 Bitcoin Live Ticker - SD Edition
+# 🚀 ESP32 Bitcoin Live Ticker - Multifunktions-Edition
 
-Dieses Projekt zeigt Bitcoin-Echtzeitdaten auf einem OLED-Display an. Die Konfiguration erfolgt bequem über eine SD-Karte, sodass SSID und Passwort nicht im Code stehen müssen.
+Dieses Open-Source-Projekt zeigt Bitcoin-Echtzeitdaten auf verschiedenen OLED- und IPS-Displays an. Die Ticker bieten Live-Kurse, prozentuale Tendenzen, die aktuelle Blockzeit sowie detaillierte Mempool-Gebührenwächter.
 
 ## 📂 Repository Struktur
 
 Das Repository ist in vier spezialisierte Hardware-Versionen unterteilt:
 
-### 1. [ESP32-Wroom + SD-Adapter](./ESP32-WROOM-Oled-Bitcoin-Ticker-SD-Card)
-Für Standard ESP32-Boards mit externem SD-Kartenmodul.
-*   **Display:** Integriert oder I2C (SDA: 21, SCL: 22)
-*   **SD-Anbindung:** SPI-Modus (MISO: 19, MOSI: 23, SCK: 18, CS: 5)
-
-![Vorschau des Bitcoin Tickers](ESP32-Bitcoin-Ticker.png)
+### 1. [ESP32-Wroom Ticker (WiFi-Manager Edition)](./ESP32-WROOM-Oled-Bitcoin-Ticker-SD-Card)
+Für Standard ESP32-Boards mit I2C-OLED (SDA: 21, SCL: 22). 
+*   **Besonderheit:** Komplett auf **WiFiManager** umgestellt! Es sind keine festen WLAN-Daten im Code nötig. Der Ticker holt die Preise schlüssellos direkt von `mempool.space` und zeichnet einen fortlaufenden Autoscale-Live-Chart der letzten 32 Minuten.
 
 ### 2. [ESP32-CAM-Version](./ESP32-CAM-Bitcoin-Ticker-SD-Card)
-Optimiert für das ESP32-CAM Board mit integriertem SD-Slot.
-*   **Besonderheit:** Nutzt den SD_MMC Bus im 1-Bit Modus, um Pins für das Display frei zu halten.
+Optimiert für das ultrakompakte ESP32-CAM Board mit integriertem MicroSD-Slot.
+*   **Besonderheit:** Nutzt den SD_MMC Bus im 1-Bit Modus und die versteckte Datei `/.wifi.txt` zur Konfiguration. Preise werden schlüssellos von `mempool.space` abgerufen.
 *   **Display-Pins:** SDA: GPIO 13, SCL: GPIO 12
-*   **Spannung:** Empfohlen wird der Anschluss des Displays an 5V, um Helligkeitsprobleme bei SD-Zugriffen zu vermeiden.
 
-### 3. [ESP32-C3-Version / SPI-SD](./ESP32-C3-Ext-Oled-Ext-SD-Cardreader-Bitcoin-Ticker)
+### 3. [ESP32-C3-Version (Messing-Satellit / SPI-SD)](./ESP32-C3-Ext-Oled-Ext-SD-Cardreader-Bitcoin-Ticker)
 Optimiert für das stromsparende ESP32-C3-Board mit externem SD-Kartenleser.
+*   **Besonderheit:** Hardware-SPI-Bus-Trennung zur Vermeidung von Datenkonflikten. Nutzt ebenfalls die verschlüsselte/versteckte `/.wifi.txt`.
 *   **Display-Pins:** SDA: GPIO 10, SCL: GPIO 21
-*   **Spannung:** Empfohlen wird der Anschluss des Displays an 5V, um Helligkeitsprobleme bei SD-Zugriffen zu vermeiden. Ein Betrieb an 3.3V ist unter stabieler Stromversorgung zulässig.
 
----
-
-### 4. [ESP32-C3 Mini-Version (Autonomes Steckbrett)](./ESP32-C3-Mini-Ticker-72x40)
+### 4. [ESP32-C3 Mini-Version (WiFi-Manager Edition)](./ESP32-C3-OLED-72x40)
 Ultraminimale Standalone-Version ohne SD-Kartenleser für den Schreibtisch. Nutzt ein winziges 72x40 Pixel OLED-Display mit maximaler Informationsdichte.
+*   **Besonderheit:** Komplett auf **WiFiManager** umgestellt! Zeigt bei fehlender Verbindung eine bequeme Handy-Anleitung im Webinterface-Modus an. Bietet eine integrierte NTP-Uhrzeit sowie einen pixelgenauen Autoscale-Trend-Chart der letzten 18 Minuten direkt von `mempool.space`.
 *   **Display-Pins:** SDA: GPIO 5, SCL: GPIO 6
-*   **Besonderheit:** Zeigt die NTP-Uhrzeit voll integriert auf allen 5 Rotationsseiten an.
 
 ---
 
-## ⚙️ Konfiguration (SD-Karte)
-Erstelle eine versteckte Datei namens `.wifi.txt` im Hauptverzeichnis deiner MicroSD-Karte (FAT32 formatiert):
-Damit die Datei auch unter Windows versteckt ist muss das dementsprechende Flag gesetzt werden: Mit der rechten Maustaste auf die Datei klicken, dann auf Eigenschaften und in dem Eigenschftsfenster den Haken auf Versteckt setzen.
-1. Zeile: WLAN SSID (Leerzeichen im Namen sind erlaubt)
-2. Zeile: WLAN Passwort
+## ⚙️ Netzwerk-Konfiguration (WiFiManager vs. SD-Karte)
 
+### Für die WiFiManager-Editionen (Wroom & C3-Mini):
+Sollte der Ticker kein bekanntes Netzwerk finden, öffnet er automatisch einen eigenen Access Point (z. B. `C3-Ticker-AP` oder `Wroom-Ticker-AP`). 
+1. Verbinde dein Smartphone mit diesem unverschlüsselten WLAN.
+2. Öffne im Browser die IP-Adresse `192.168.4.1`.
+3. Wähle dein Heim-WLAN aus, tippe das Passwort ein und speichere. Der ESP32 sichert die Daten dauerhaft im internen NVS-Speicher.
+
+### Für die klassischen Versionen mit SD-Karte (CAM & C3-Satellit):
+Erstelle eine versteckte Datei namens `.wifi.txt` im Hauptverzeichnis deiner MicroSD-Karte (FAT32 formatiert).
+```text
+DEINE_WLAN_SSID
+DEIN_WLAN_PASSWORT
+```
+
+---
 
 ## ✨ Features
-- 💰 **Preise:** Live-Kurse in EUR (ohne Nachkommastellen für optimalen Platz) und USD von CryptoCompare.
-- 📉 **Trend:** Prozentuale Änderung und Tendenz-Pfeile (+^ / v / --) seit dem letzten API-Abruf.
-- ⛓️ ***Blockchain:** Große, unübersehbare Anzeige der aktuellen Blockhöhe ("Bitcoin-Weltzeit").
-- 🚦 **Mempool:** Aktuelle, empfohlene On-Chain-Gebühren (Fast/Med/Slow) direkt von mempool.space.
+- 💰 **Preise:** Live-Kurse in EUR und USD schlüssellos direkt von der Open-Source-Plattform `mempool.space`.
+- 📉 **Trend-Charts:** Fortlaufend gezeichnete Live-Kurven auf dem OLED mit intelligentem 5%-Polster (Autoscale), damit die Kurve niemals oben oder unten flachdrückt.
+- ⛓️ **Blockchain:** Große, unübersehbare Anzeige der aktuellen Blockhöhe.
+- 🚦 **Mempool:** Aktuelle, empfohlene On-Chain-Gebühren (Fast/Med/Slow).
 - 🕒 **NTP:** Automatische Uhrzeitsynchronisation im Hintergrund.
-- 💡 **Low-Fee-Alert:** Onboard LED leuchtet dauerhaft als Indikator auf, sobald die Gebühren unter <= 5 sat/vB fallen.
+- 💡 **Low-Fee-Alert:** Onboard LED leuchtet als Indikator, sobald die Gebühren unter <= 5 sat/vB fallen.
 
 ## 📚 Benötigte Bibliotheken
 Folgende Libraries müssen im Bibliotheksverwalter der Arduino IDE installiert sein:
-- `ESP8266 and ESP32 OLED driver for SSD1306` (Für Wroom, CAM und C3)
+- `ESP8266 and ESP32 OLED driver for SSD1306` (Für Wroom, CAM und C3-Satellit)
 - `U8g2` (Spezifisch für die 72x40 C3 Mini-Version)
-- `ArduinoJson` (Benoit Blanchon)
-- `SD_MMC` oder `SD` & `HTTPClient` (Standard ESP32 Core)
-- `WiFi`, `time`, `Wire`, `SPI` und `FS` (Integrierte Core-Bibliotheken)
-
-
-## 🔧 Board-Einstellungen (Arduino IDE)
-
-Stelle sicher, dass du im Boardverwalter das passende Board auswählst:
-
-### Für die Wroom-Version:
-*   **Board:** `DOIT ESP32 DEVKIT V1` (oder allgemein `ESP32 Dev Module`)
-*   **Upload Speed:** `115200`
-*   **Flash Frequency:** `80MHz`
-
-![Vorschau des Bitcoin Tickers](./ESP32-WROOM-Oled-Bitcoin-Ticker-SD-Card/ESP32-WROOM-Oled-Bitcoin-Ticker-SD-Card_Block.png)
-
-### Für die ESP32-CAM-Version:
-*   **Board:** `AI Thinker ESP32-CAM`
-*   **CPU Frequency:** `240MHz (WiFi/BT)`
-*   **Flash Mode:** `QIO`
-*   **Partition Scheme:** `Huge App (3MB No OTA/1MB SPIFFS)` (Wichtig, da der Code durch die Bibliotheken groß ist)
-*   **Anschluss:** Zum Flashen muss **GPIO 0 mit GND** verbunden und ein Reset ausgeführt werden!
-
-![Vorschau des Bitcoin Tickers](./ESP32-CAM-Bitcoin-Ticker-SD-Card/ESP32-CAM-Bitcoin-Ticker-SD-Card_EUR.png)
-
-### Für die C3-Version:
-*   **Board:** `ESP32C3 Dev Module` (z.B. für den ESP32-C3 SuperMini)
-*   **USB CDC On Boot:** `Enabled` (Kritisch, da der C3 USB nativ in der CPU verwaltet. Sonst schlägt der Serielle Monitor fehl!)
-*   **Upload Speed:** `115200` (Bei Verbindungsabbruch auf `921600` anheben)
-*   **Flash Frequency:** `80MHz`
-*   **Partition Scheme:** Falls der Speicherplatz knapp wird, unter Werkzeuge auf `Huge App (3MB No OTA/1MB SPIFFS)` umstellen.
-
-![Vorschau des Bitcoin Tickers](./ESP32-C3-Ext-Oled-Ext-SD-Cardreader-Bitcoin-Ticker/ESP32-C3-Ext-Oled-Ext-SD-Cardreader-Bitcoin-Ticker-EUR.png)
-
-![Vorschau des Bitcoin Tickers](./ESP32-C3-OLED-72x40/ESP32-C3-OLED-72x40-USD.png)
-
-Falls beimHochladen in den ESP32 der Speicherplatz nicht reicht, unter Werkzeuge das Partition Scheme auf Huge App umstellen.
+- `WiFiManager` by tzapu (Für die schlüssellosen Web-Setup-Versionen)
+- `ArduinoJson` (Benoit Blanchon, V7-Standard empfohlen)
 
 ---
-Erstellt mit ❤️ für die Bitcoin-Community.
+Erstellt mit ❤️ für die Bitcoin- und Bastler-Community.
