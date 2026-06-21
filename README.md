@@ -7,50 +7,62 @@ Dieses Open-Source-Projekt zeigt Bitcoin-Echtzeitdaten auf verschiedenen OLED- u
 Das Repository ist in vier spezialisierte Hardware-Versionen unterteilt:
 
 ### 1. [ESP32-Wroom Ticker (WiFi-Manager Edition)](./ESP32-WROOM-Oled-Bitcoin-Ticker-SD-Card)
-Für Standard ESP32-Boards mit I2C-OLED (SDA: 21, SCL: 22). 
-*   **Besonderheit:** Komplett auf **WiFiManager** umgestellt! Es sind keine festen WLAN-Daten im Code nötig. Der Ticker holt die Preise schlüssellos direkt von `mempool.space` und zeichnet einen fortlaufenden Autoscale-Live-Chart der letzten 32 Minuten.
+Für Standard ESP32-Boards mit I2C-OLED (SDA: 21, SCL: 22).
+*   **Besonderheit:** Komplett auf **WiFiManager** umgestellt! Keine festen WLAN-Daten im Code. Bietet einen Hardware-Reset via BOOT-Button (GPIO 0). Zeichnet einen fortlaufenden Autoscale-Live-Chart der letzten 32 Minuten (64 Punkte).
 
-### 2. [ESP32-CAM-Version](./ESP32-CAM-Bitcoin-Ticker-SD-Card)
-Optimiert für das ultrakompakte ESP32-CAM Board mit integriertem MicroSD-Slot.
-*   **Besonderheit:** Nutzt den SD_MMC Bus im 1-Bit Modus und die versteckte Datei `/.wifi.txt` zur Konfiguration. Preise werden schlüssellos von `mempool.space` abgerufen.
-*   **Display-Pins:** SDA: GPIO 13, SCL: GPIO 12
+![Vorschau des Bitcoin Tickers](ESP32-Bitcoin-Ticker.png)
 
-### 3. [ESP32-C3-Version (Messing-Satellit / SPI-SD)](./ESP32-C3-Ext-Oled-Ext-SD-Cardreader-Bitcoin-Ticker)
-Optimiert für das stromsparende ESP32-C3-Board mit externem SD-Kartenleser.
-*   **Besonderheit:** Hardware-SPI-Bus-Trennung zur Vermeidung von Datenkonflikten. Nutzt ebenfalls die verschlüsselte/versteckte `/.wifi.txt`.
-*   **Display-Pins:** SDA: GPIO 10, SCL: GPIO 21
+
+### 2. [ESP32-CAM (Diebstahlsichere Edition)](./ESP32-CAM-Bitcoin-Ticker-SD-Card)
+Optimiert für das ESP32-CAM Board mit integriertem MicroSD-Slot (SDA: GPIO 13, SCL: GPIO 12).
+*   **Besonderheit:** **Integrierter Diebstahlschutz!** Importiert beim Booten die `wifi.txt` von der SD-Karte flüchtig in den internen CPU-Flash (Preferences) und **löscht die Datei sofort unwiderruflich von der Karte**. Zeigt nach 32 Minuten den vollautomatisch skalierten Live-Chart.
+
+![Vorschau des Bitcoin Tickers](./ESP32-CAM-Bitcoin-Ticker-SD-Card/ESP32-CAM-Bitcoin-Ticker-SD-Card_EUR.png)
+
+
+### 3. [ESP32-C3-Version (Diebstahlsicherer Messing-Satellit)](./ESP32-C3-Ext-Oled-Ext-SD-Cardreader-Bitcoin-Ticker)
+Optimiert für das stromsparende ESP32-C3-Board mit externem SD-Kartenleser (SDA: GPIO 10, SCL: GPIO 21).
+*   **Besonderheit:** Nutzt dasselbe **Diebstahlschutz-Löschverfahren** via NVS-Speicher über die sichtbare `wifi.txt`. Bietet Hardware-SPI-Bus-Trennung zur Vermeidung von Signalstörungen.
+
+![Vorschau des Bitcoin Tickers](./ESP32-C3-Ext-Oled-Ext-SD-Cardreader-Bitcoin-Ticker/ESP32-C3-Ext-Oled-Ext-SD-Cardreader-Bitcoin-Ticker-EUR.png)
+
 
 ### 4. [ESP32-C3 Mini-Version (WiFi-Manager Edition)](./ESP32-C3-OLED-72x40)
-Ultraminimale Standalone-Version ohne SD-Kartenleser für den Schreibtisch. Nutzt ein winziges 72x40 Pixel OLED-Display mit maximaler Informationsdichte.
-*   **Besonderheit:** Komplett auf **WiFiManager** umgestellt! Zeigt bei fehlender Verbindung eine bequeme Handy-Anleitung im Webinterface-Modus an. Bietet eine integrierte NTP-Uhrzeit sowie einen pixelgenauen Autoscale-Trend-Chart der letzten 18 Minuten direkt von `mempool.space`.
-*   **Display-Pins:** SDA: GPIO 5, SCL: GPIO 6
+Ultraminimale Standalone-Version ohne SD-Kartenleser für den Schreibtisch (SDA: GPIO 5, SCL: GPIO 6).
+*   **Besonderheit:** Komplett auf **WiFiManager** umgestellt! Bietet einen physischen Werksreset über den BOOT-Button (GPIO 9) und zeigt bei fehlender Verbindung eine bequeme Handy-Anleitung auf dem 72x40 Mini-Display. Inklusive 18-Minuten-Trend-Chart.
+
+![Vorschau des Bitcoin Tickers](./ESP32-C3-OLED-72x40/ESP32-C3-OLED-72x40-USD.png)
+
 
 ---
 
-## ⚙️ Netzwerk-Konfiguration (WiFiManager vs. SD-Karte)
+## ⚙️ Netzwerk-Konfiguration (WiFiManager vs. Diebstahlschutz)
 
-### Für die WiFiManager-Editionen (Wroom & C3-Mini):
-Sollte der Ticker kein bekanntes Netzwerk finden, öffnet er automatisch einen eigenen Access Point (z. B. `C3-Ticker-AP` oder `Wroom-Ticker-AP`). 
-1. Verbinde dein Smartphone mit diesem unverschlüsselten WLAN.
-2. Öffne im Browser die IP-Adresse `192.168.4.1`.
-3. Wähle dein Heim-WLAN aus, tippe das Passwort ein und speichere. Der ESP32 sichert die Daten dauerhaft im internen NVS-Speicher.
+### 1. Für die WiFiManager-Editionen (Wroom & C3-Mini):
+Sollte der Ticker kein Netzwerk finden, öffnet er den Access Point `Wroom-BTC-Ticker-AP` oder `C3-Ticker-AP`. 
+1. Verbinde dein Handy mit dem WLAN.
+2. Rufe im Browser `192.168.4.1` auf.
+3. Tippe dein WLAN-Passwort ein. 
+*   **Hardware-Reset:** Halte beim Einschalten den **BOOT-Button** (Wroom: GPIO 0 / C3: GPIO 9) für 3 Sekunden gedrückt, um den Speicher manuell zu löschen.
 
-### Für die klassischen Versionen mit SD-Karte (CAM & C3-Satellit):
-Erstelle eine versteckte Datei namens `.wifi.txt` im Hauptverzeichnis deiner MicroSD-Karte (FAT32 formatiert).
+### 2. Für die Diebstahlsicheren SD-Editionen (CAM & Satellit):
+Erstelle eine ganz normale, sichtbare Textdatei namens `wifi.txt` im Hauptverzeichnis deiner MicroSD-Karte (FAT32 formatiert):
 ```text
 DEINE_WLAN_SSID
 DEIN_WLAN_PASSWORT
 ```
+*   **Der Sicherheits-Ablauf:** Beim ersten Start liest der Ticker die Karte aus, brennt die Daten fest in den internen, geschützten Speicher (NVS) des ESP32-Chips und **löscht die `wifi.txt` sofort vollständig von der SD-Karte**. 
+*   **WLAN wechseln:** Um neue Daten einzuspeisen, erstelle am PC einfach eine neue `wifi.txt` auf der Karte. Der Ticker überschreibt beim nächsten Booten den alten internen Speicher und löscht die Datei wieder.
 
 ---
 
 ## ✨ Features
-- 💰 **Preise:** Live-Kurse in EUR und USD schlüssellos direkt von der Open-Source-Plattform `mempool.space`.
-- 📉 **Trend-Charts:** Fortlaufend gezeichnete Live-Kurven auf dem OLED mit intelligentem 5%-Polster (Autoscale), damit die Kurve niemals oben oder unten flachdrückt.
-- ⛓️ **Blockchain:** Große, unübersehbare Anzeige der aktuellen Blockhöhe.
-- 🚦 **Mempool:** Aktuelle, empfohlene On-Chain-Gebühren (Fast/Med/Slow).
+- 💰 **Preise:** Live-Kurse in EUR und USD vollkommen schlüssellos direkt von der Open-Source-Plattform `mempool.space`.
+- 📉 **Trend-Charts:** Dynamische Kurven-Anzeige mit **Autoscale-Algorithmus (5% Padding)**, damit die Kurve niemals an den oberen oder unteren Displayrand anstößt oder abgeschnitten wird.
+- ⛓️ **Blockchain:** Große, unübersehbare Anzeige der aktuellen Blockhöhe ("Bitcoin-Weltzeit").
+- 🚦 **Mempool:** Aktuelle, empfohlene On-Chain-Gebühren (Fast/Med/Slow) direkt von `mempool.space`.
 - 🕒 **NTP:** Automatische Uhrzeitsynchronisation im Hintergrund.
-- 💡 **Low-Fee-Alert:** Onboard LED leuchtet als Indikator, sobald die Gebühren unter <= 5 sat/vB fallen.
+- 💡 **Low-Fee-Alert:** Onboard LED leuchtet dauerhaft, sobald die Gebühren unter <= 5 sat/vB fallen.
 
 ## 📚 Benötigte Bibliotheken
 Folgende Libraries müssen im Bibliotheksverwalter der Arduino IDE installiert sein:
@@ -58,6 +70,7 @@ Folgende Libraries müssen im Bibliotheksverwalter der Arduino IDE installiert s
 - `U8g2` (Spezifisch für die 72x40 C3 Mini-Version)
 - `WiFiManager` by tzapu (Für die schlüssellosen Web-Setup-Versionen)
 - `ArduinoJson` (Benoit Blanchon, V7-Standard empfohlen)
+- `Preferences` & `Wire` & `SD_MMC` (Integrierte ESP32 Core-Bibliotheken)
 
 ---
 Erstellt mit ❤️ für die Bitcoin- und Bastler-Community.
