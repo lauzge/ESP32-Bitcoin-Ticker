@@ -159,7 +159,13 @@ String getLocalTimeStr() {
 
 void setup() {
   Serial.begin(115200);
-  
+  delay(1000); // Dem USB-CDC beim C3 Zeit geben, stabil zu werden
+  Serial.println("\n--- WiFi-Manager C3 Ticker startet ---");
+
+  // 1. HARDWARE-BUTTON RESET LOGIK (GPIO 9 ist der BOOT-Button beim C3 SuperMini)
+  const int BUTTON_PIN = 9; 
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
+
   pinMode(ONBOARD_LED, OUTPUT);
   digitalWrite(ONBOARD_LED, HIGH); // Erstmal aus (Active Low)
   
@@ -167,9 +173,34 @@ void setup() {
     priceHistory[i] = 0;
   }
 
+  // Display initialisieren für sofortiges Feedback beim Booten
   Wire.begin(5, 6); 
   u8g2.begin();
-  
+
+  // Prüfen, ob der BOOT-Knopf direkt beim Starten gedrückt gehalten wird (LOW = gedrückt)
+  if (digitalRead(BUTTON_PIN) == LOW) {
+    u8g2.clearBuffer();
+    u8g2.setFont(u8g2_font_5x7_tf);
+    u8g2.drawStr(0, 10, "RESET-MODUS!");
+    u8g2.drawStr(0, 22, "Knopf halten...");
+    u8g2.sendBuffer();
+    
+    delay(3000); // 3 Sekunden Sicherheits-Wartezeit gegen versehentliches Drücken
+
+    if (digitalRead(BUTTON_PIN) == LOW) {
+      Serial.println("!!! C3 WLAN-Schnittstelle manuell zurueckgesetzt !!!");
+      u8g2.clearBuffer();
+      u8g2.drawStr(0, 15, "WLAN ");
+      u8g2.drawStr(0, 28, "GELÖSCHT!");
+      u8g2.sendBuffer();
+      delay(2000);
+      
+      WiFiManager wm;
+      wm.resetSettings(); // Löscht die gespeicherten Router-Daten im NVS-Flash
+    }
+  }
+
+  // 2. NORMALER STARTVORGANG
   u8g2.clearBuffer();
   u8g2.setFont(u8g2_font_6x10_tf);
   u8g2.drawStr(0, 15, "WLAN...");
@@ -182,15 +213,10 @@ void setup() {
 
   WiFiManager wm;
   
-  // OPTIONAL: Wenn du die alten, gespeicherten WLAN-Daten löschen willst,
-  // entferne die zwei Schrägstriche vor der nächsten Zeile zum Testen einmalig:
-  // wm.resetSettings();
-
-
   // Falls kein bekanntes WLAN gefunden wird, schaltet das kleine Display um:
   wm.setAPCallback([](WiFiManager *myWiFiManager) {
     u8g2.clearBuffer();
-    u8g2.setFont(u8g2_font_4x6_tf);
+    u8g2.setFont(u8g2_font_4x6_tf); // Ultrakompakte Schrift für das 72x40 Display
     u8g2.drawStr(0, 6, "KEIN WLAN GEFUNDEN!");
     u8g2.drawStr(0, 16, "Handy verbinden mit:");
     u8g2.setFont(u8g2_font_5x7_tf);
@@ -198,9 +224,10 @@ void setup() {
     u8g2.setFont(u8g2_font_4x6_tf);
     u8g2.drawStr(0, 36, "Browser: 192.168.4.1");
     u8g2.sendBuffer();
+    Serial.println("Portal-Modus aktiv.");
   });
 
-  // Verbindungsversuch oder Portal oeffnen
+  // Startet das Portal "C3-Ticker-AP", falls kein WLAN erreichbar ist
   if (!wm.autoConnect("C3-Ticker-AP")) {
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_5x7_tf);
@@ -216,6 +243,7 @@ void setup() {
   u8g2.sendBuffer();
   delay(1500);
 
+  // Uhrzeit via NTP holen und ersten API-Abruf starten
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
   updateAllData();
 }
