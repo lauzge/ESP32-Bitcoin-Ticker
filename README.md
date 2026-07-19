@@ -20,7 +20,7 @@ Optimiert für das ESP32-CAM Board mit integriertem MicroSD-Slot (SDA: GPIO 13, 
 ![Vorschau des Bitcoin Tickers](./ESP32-CAM-Bitcoin-Ticker-SD-Card/ESP32-CAM-Bitcoin-Ticker-SD-Card_EUR.png)
 
 
-### 3. [ESP32-C3-Version (Diebstahlsicherer Messing-Satellit)](./ESP32-C3-Ext-Oled-Ext-SD-Cardreader-Bitcoin-Ticker)
+### 3. [ESP32-C3-Version (Diebstahlsicherer für den zukünftigen Messing-Satellit)](./ESP32-C3-Ext-Oled-Ext-SD-Cardreader-Bitcoin-Ticker)
 Optimiert für das stromsparende ESP32-C3-Board mit externem SD-Kartenleser (SDA: GPIO 10, SCL: GPIO 21).
 *   **Besonderheit:** Nutzt dasselbe **Diebstahlschutz-Löschverfahren** via NVS-Speicher über die sichtbare `wifi.txt`. Bietet Hardware-SPI-Bus-Trennung zur Vermeidung von Signalstörungen.
 
@@ -32,6 +32,39 @@ Ultraminimale Standalone-Version ohne SD-Kartenleser für den Schreibtisch (SDA:
 *   **Besonderheit:** Komplett auf **WiFiManager** umgestellt! Bietet einen physischen Werksreset über den BOOT-Button (GPIO 9) und zeigt bei fehlender Verbindung eine bequeme Handy-Anleitung auf dem 72x40 Mini-Display. Inklusive 18-Minuten-Trend-Chart.
 
 ![Vorschau des Bitcoin Tickers](./ESP32-C3-OLED-72x40/ESP32-C3-OLED-72x40-USD.png)
+
+
+### 5. 🛰️ ESP32-C3 Bitcoin Brass Satellite Ticker
+
+Ein ultrakompakter, autonomer Bitcoin- und Mempool-Ticker, verpackt in einem kunstvoll handgelöteten Messing-Drahtskelett. Das Projekt basiert auf dem **ESP32-C3 SuperMini** und visualisiert Live-Blockchain-Daten auf einem winzigen 0,49" OLED-Display, begleitet von drei unabhängig voneinander blinkenden Status-LEDs.
+
+## ✨ Features
+
+- **Ultrakompaktes UI:** Pixelgenaue Anpassung an ein Hailege 0,49" OLED-Display (64x32 Pixel) unter Verwendung der ressourcenschonenden `SSD1306Wire`-Bibliothek.
+- **Multitasking LED-Muster:** Komplett unblockierte Steuerung über Zeitstempel (`millis()`) – keine Verzögerungen bei der Datenanzeige.
+- **Live Blockchain-Metriken:** Automatische Rotation zwischen Bitcoin-Preis (EUR/USD), prozentualer 24h-Änderung, aktueller Blockzeit, Live-Mempool-Gebühren und einem dynamisch gezeichneten 16-Minuten-Preistrend (Line-Chart).
+- **WiFiManager mit RF-Schutz:** Komfortables Einrichten des WLANs über ein Web-Portal. Die Sendeleistung der internen Antenne ist softwareseitig aggressiv gedrosselt (`8.5dBm`), um elektromagnetische Interferenzen (RF-Noise) mit den dichten Messing-Drahtbahnen zu verhindern.
+- **Hardware-WLAN-Reset:** Durch Halten des integrierten `BOOT`-Buttons (GPIO 9) für 3 Sekunden beim Starten wird der interne NVS-WLAN-Speicher gelöscht, um den Satelliten mobil in anderen Netzwerken anzumelden.
+
+## 📌 Hardware-Pinout (ESP32-C3 SuperMini)
+
+| Komponente | Pin (GPIO) | Beschreibung / Logik |
+| :--- | :---: | :--- |
+| **OLED SDA** | `21` | I2C Datenleitung zum 0,49" Display |
+| **OLED SCL** | `20` | I2C Taktleitung zum 0,49" Display |
+| **LED Gelb** | `3` | System-Aktivität: Blinkt schnell im 600ms-Takt (leuchtet statisch bei API-Abruf) |
+| **LED Grün** | `2` | Puls-Anzeige: Blinkt ruhig im langsamen 150ms-Takt |
+| **LED Blau** | `8` | **Fee-Alarm:** Blinkt asynchron im 500ms-Takt, sobald die Gebühren `<= 5 sat/vB` fallen (Nutzt Active-Low-Logik parallel zur Onboard-LED) |
+| **BOOT-Button**| `9` | Halten beim Einschalten löscht die WLAN-Daten |
+
+## 🛠️ Abhängigkeiten (Arduino IDE Libraries)
+
+Für das Kompilieren werden folgende Bibliotheken benötigt:
+- `ESP32-SSD1306-WebThing` (bzw. ThingPulse `ESP8266 and ESP32 OLED driver for SSD1306 displays`)
+- `ArduinoJson` (Optimiert für Version 7+)
+- `WiFiManager` (von tablatronix)
+
+> ⚠️ **Wichtig für die Arduino IDE:** Setze unter *Werkzeuge -> PSRAM* den Wert zwingend auf **`Disabled`**, um den Netzwerk-Stack des C3-Chips stabil zu halten.
 
 
 ---

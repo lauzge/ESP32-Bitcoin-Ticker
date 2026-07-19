@@ -11,9 +11,9 @@
 #define OLED_SDA 21
 #define OLED_SCL 20
 
-#define LED_RED    2
-#define LED_YELLOW 3
-#define LED_BLUE   8 // Dies ist auch die Fee-Alarm LED
+#define LED_GREEN  2  // Pin 2 blinkt langsam (600ms)
+#define LED_YELLOW 3  // Pin 3 blinkt schnell (150ms) / statisch bei API-Abruf
+#define LED_RED    8  // Pin 8 ist die Fee-Alarm LED (Active Low)
 
 // 64x32 Pixel OLED Initialisierung (0x3c Adresse)
 SSD1306Wire display(0x3c, OLED_SDA, OLED_SCL, GEOMETRY_64_32);
@@ -33,6 +33,12 @@ int historyCount = 0;
 const char* ntpServer = "pool.ntp.org";
 const long  gmtOffset_sec = 3600; 
 const int   daylightOffset_sec = 3600;
+
+// Globale Variablen für das asynchrone Multitasking-Blinken
+unsigned long timerYellow = 0;
+unsigned long timerGreen = 0;
+bool stateYellow = false;
+bool stateGreen = false;
 
 void addPriceToHistory(float newPrice) {
   if (historyCount < CHART_POINTS) {
@@ -68,7 +74,6 @@ void drawChart() {
   minPrice -= priceDelta * 0.05;
   priceDelta = maxPrice - minPrice;
 
-  // Chart nutzt exakt Y=12 bis Y=31 (Höhe 19 Pixel)
   int chartHeight = 19;
   int chartOffsetY = 31;
 
@@ -87,9 +92,9 @@ void drawChart() {
 }
 
 void blinkLEDsTest() {
-  digitalWrite(LED_RED, HIGH); delay(200); digitalWrite(LED_RED, LOW);
+  digitalWrite(LED_GREEN, HIGH); delay(200); digitalWrite(LED_GREEN, LOW);
   digitalWrite(LED_YELLOW, HIGH); delay(200); digitalWrite(LED_YELLOW, LOW);
-  digitalWrite(LED_BLUE, HIGH); delay(200); digitalWrite(LED_BLUE, LOW);
+  digitalWrite(LED_RED, HIGH); delay(200); digitalWrite(LED_RED, LOW);
 }
 
 void updateData() {
@@ -102,6 +107,8 @@ void updateData() {
   http.setTimeout(10000);
 
   int httpCode;
+  
+  // Gelbe LED geht beim Web-Abruf statisch an
   digitalWrite(LED_YELLOW, HIGH);
 
   if (http.begin(client, "https://mempool.space/api/v1/prices")) {
@@ -137,7 +144,7 @@ void updateData() {
     http.addHeader("User-Agent", "ESP32-C3-Satellit");
     httpCode = http.GET(); 
     if (httpCode == 200) {
-      StaticJsonDocument<512> doc;
+      JsonDocument doc;
       deserializeJson(doc, http.getString());
       fastestFee = doc["fastestFee"];
       halfHourFee = doc["halfHourFee"];
@@ -158,10 +165,11 @@ void updateData() {
     http.end();
   }
   
+  // Blaue LED Fee-Alarm
   if (fastestFee > 0 && fastestFee <= 5) {
-    digitalWrite(LED_BLUE, LOW); 
+    digitalWrite(LED_RED, LOW); 
   } else {
-    digitalWrite(LED_BLUE, HIGH); 
+    digitalWrite(LED_RED, HIGH); 
   }
   
   digitalWrite(LED_YELLOW, LOW); 
@@ -175,38 +183,32 @@ String getLocalTimeStr() {
   strftime(timeStringBuff, sizeof(timeStringBuff), "%H:%M", &timeinfo);
   return String(timeStringBuff);
 }
-
 void setup() {
   Serial.begin(115200);
-  delay(1000); // Dem USB-CDC beim C3 Zeit geben, stabil zu werden
-  Serial.println("\n--- WiFi-Manager C3 Satellit startet ---");
+  delay(1000); 
 
-  // 1. HARDWARE-BUTTON RESET LOGIK (GPIO 9 ist der BOOT-Button beim C3 SuperMini)
   const int BUTTON_PIN = 9; 
   pinMode(BUTTON_PIN, INPUT_PULLUP);
 
-  // LED Pins konfigurieren
-  pinMode(LED_RED, OUTPUT);
+  pinMode(LED_GREEN, OUTPUT);
   pinMode(LED_YELLOW, OUTPUT);
-  pinMode(LED_BLUE, OUTPUT);
+  pinMode(LED_RED, OUTPUT); // Pin 8 (Deine blaue LED / Fee-Alarm)
   
-  // Alle LEDs initial ausschalten
-  digitalWrite(LED_RED, LOW);
+  digitalWrite(LED_GREEN, LOW);
   digitalWrite(LED_YELLOW, LOW);
-  digitalWrite(LED_BLUE, HIGH); // Active Low Aus-Zustand
+  digitalWrite(LED_RED, HIGH); // Active Low Aus-Zustand für Pin 8 (Onboard-LED Aus)
 
-  blinkLEDsTest(); // Kurzer Funktionstest aller LEDs beim Einschalten
+  blinkLEDsTest(); 
 
   for (int i = 0; i < CHART_POINTS; i++) {
     priceHistory[i] = 0.0;
   }
 
-  // I2C-Bus explizit auf deinen Wunsch-Pins 21 und 20 starten
   Wire.begin(OLED_SDA, OLED_SCL);
   display.init();
   display.flipScreenVertically();
 
-  // Prüfen, ob der BOOT-Knopf DIREKT beim Starten gedrückt gehalten wird (LOW = gedrückt)
+  // Prüfen, ob der BOOT-Knopf (GPIO 9) direkt beim Einschalten gehalten wird
   if (digitalRead(BUTTON_PIN) == LOW) {
     display.clear();
     display.setFont(ArialMT_Plain_10);
@@ -215,47 +217,40 @@ void setup() {
     display.drawString(0, 24, "halten...");
     display.display();
     
-    // Gelbe LED leuchtet als Warnung während des Countdowns
     digitalWrite(LED_YELLOW, HIGH);
-    delay(3000); // 3 Sekunden Sicherheits-Wartezeit gegen versehentliches Drücken
+    delay(3000); 
 
-    // Nach 3 Sekunden prüfen, ob der Knopf immer noch gehalten wird
     if (digitalRead(BUTTON_PIN) == LOW) {
-      Serial.println("!!! C3 WLAN-Schnittstelle manuell zurückgesetzt !!!");
       display.clear();
       display.drawString(0, 5, "WLAN ");
       display.drawString(0, 18, "GELÖSCHT!");
       display.display();
       
-      // Rote LED blinkt schnell zur Bestätigung
       for(int i=0; i<6; i++) {
-        digitalWrite(LED_RED, !digitalRead(LED_RED));
+        digitalWrite(LED_GREEN, !digitalRead(LED_GREEN));
         delay(150);
       }
-      digitalWrite(LED_RED, LOW);
+      digitalWrite(LED_GREEN, LOW);
 
       WiFiManager wm;
-      wm.resetSettings(); // Löscht die gespeicherten Router-Daten im NVS-Flash
+      wm.resetSettings(); 
     }
     digitalWrite(LED_YELLOW, LOW);
   }
 
-  // 2. NORMALER STARTVORGANG
   display.clear();
   display.setFont(ArialMT_Plain_10);
   display.drawString(0, 10, "WLAN...");
   display.display();
 
-  // WiFi Vorbereitung aus dem funktionierenden Mini-Stack
   WiFi.disconnect(true); 
   delay(500);
   WiFi.mode(WIFI_STA);   
   WiFi.setSleep(false);  
-  WiFi.setTxPower(WIFI_POWER_8_5dBm); // Sendeleistung drosseln gegen BOD/Interferenzen
+  WiFi.setTxPower(WIFI_POWER_8_5dBm); 
 
   WiFiManager wm;
 
-  // AP-Anzeige auf dem 64x32 Display platzsparend ausgeben
   wm.setAPCallback([](WiFiManager *myWiFiManager) {
     display.clear();
     display.setFont(ArialMT_Plain_10);
@@ -263,12 +258,9 @@ void setup() {
     display.drawString(0, 11, "Satellit-AP");
     display.drawString(0, 22, "192.168.4.1");
     display.display();
-    
-    // Gelbe LED leuchtet im Portal-Modus dauerhaft
     digitalWrite(LED_YELLOW, HIGH);
   });
 
-  // Startet das Portal "Satellit-Ticker-AP", falls kein WLAN erreichbar ist
   if (!wm.autoConnect("Satellit-Ticker-AP")) {
     display.clear();
     display.drawString(0, 10, "WM Fehler!");
@@ -286,7 +278,40 @@ void setup() {
   updateData();
 }
 
+// FIX: Variable umbenannt, um Namenskonflikte mit dem ESP32-Core Core zu verhindern!
+unsigned long timerBlueAlarm = 0;
+bool stateAlarm = false;
+
 void loop() {
+  unsigned long now = millis();
+
+  // 1. GELBE LED: Schnelles Blinken (150 ms)
+  if (now - timerYellow >= 150) {
+    timerYellow = now;
+    stateYellow = !stateYellow;
+    if (now - lastUpdate <= 30000) {
+      digitalWrite(LED_YELLOW, stateYellow ? HIGH : LOW);
+    }
+  }
+
+  // 2. GRÜNE LED: Langsames Blinken (600 ms)
+  if (now - timerGreen >= 600) {
+    timerGreen = now;
+    stateGreen = !stateGreen;
+    digitalWrite(LED_GREEN, stateGreen ? HIGH : LOW);
+  }
+
+  // 3. BLAUE/ROTE LED (PIN 8): Dynamischer Blink-FeeAlarm bei <= 5 sat/vB
+  if (fastestFee > 0 && fastestFee <= 5) {
+    if (now - timerBlueAlarm >= 500) {
+      timerBlueAlarm = now;
+      stateAlarm = !stateAlarm;
+      digitalWrite(LED_RED, stateAlarm ? HIGH : LOW); 
+    }
+  } else {
+    digitalWrite(LED_RED, HIGH); // Dauer-AUS im Leerlauf (Invertiert für Onboard-LED Schutz)
+  }
+
   if (WiFi.status() != WL_CONNECTED) {
     display.clear();
     display.setFont(ArialMT_Plain_10);
@@ -298,40 +323,35 @@ void loop() {
     return;
   }
 
-  if (millis() - lastUpdate > 30000 || lastUpdate == 0) { 
+  if (now - lastUpdate > 30000 || lastUpdate == 0) { 
     updateData(); 
   }
 
   display.clear();
   String currentTime = getLocalTimeStr();
-
-  // FIX: Alle Seiten nutzen jetzt die kompakte Arial_10 Schriftart
   display.setFont(ArialMT_Plain_10);
 
-  if (displayMode == 0 || displayMode == 1) { // 1. & 2. PREISE (EUR / USD)
-    // Zeile 1: Ticker-Kopf
+  if (displayMode == 0 || displayMode == 1) { 
     if (displayMode == 0) display.drawString(0, 0, "EUR " + currentTime);
     else display.drawString(0, 0, "USD " + currentTime);
     
-    // Zeile 2: Preis kompakt formatiert (z. B. "54817 EUR" passt jetzt locker nebeneinander)
     if (displayMode == 0) display.drawString(0, 11, String(priceEur, 0) + " EUR");
     else display.drawString(0, 11, "$ " + String(priceUsd, 0));
     
-    // Zeile 3: Trend
     String sign = (percentChange >= 0) ? "+ " : "";
     display.drawString(0, 22, "Chg: " + sign + String(percentChange, 2) + "%");
   } 
-  else if (displayMode == 2) { // 3. BLOCKZEIT (In zwei kompakte Zeilen aufgeteilt)
+  else if (displayMode == 2) { 
     display.drawString(0, 0, "Blockheight:");
     display.drawString(0, 11, "#" + String(blockHeight));
     display.drawString(0, 22, "Zeit: " + currentTime);
   }
-  else if (displayMode == 3) { // 4. MEMPOOL (Kompakte 3er Einteilung, Zeilenabstand exakt 11 Pixel)
+  else if (displayMode == 3) { 
     display.drawString(0, 0, "FEE (sat/vB)");
     display.drawString(0, 11, "F:" + String(fastestFee) + "  M:" + String(halfHourFee));
     display.drawString(0, 22, "Slow: " + String(hourFee));
   }
-  else if (displayMode == 4) { // 5. SEITE: LIVE CHART
+  else if (displayMode == 4) { 
     display.drawString(0, 0, "Trend " + currentTime);
     drawChart();
   }
@@ -344,9 +364,38 @@ void loop() {
     displayMode = (displayMode + 1) % 4; 
   }
   
+  // Nicht-blockierendes Warten für das Display (5 Sekunden)
   unsigned long startDelay = millis();
   while (millis() - startDelay < 5000) {
     WiFi.setTxPower(WIFI_POWER_8_5dBm);
+    
+    unsigned long loopNow = millis();
+    
+    // LEDs in der Warteschleife weiterblinken lassen
+    if (loopNow - timerYellow >= 600) {
+      timerYellow = loopNow;
+      stateYellow = !stateYellow;
+      if (loopNow - lastUpdate <= 30000) {
+        digitalWrite(LED_YELLOW, stateYellow ? HIGH : LOW);
+      }
+    }
+    if (loopNow - timerGreen >= 150) {
+      timerGreen = loopNow;
+      stateGreen = !stateGreen;
+      digitalWrite(LED_GREEN, stateGreen ? HIGH : LOW);
+    }
+    
+    // Fee-Alarm Blinken in der Warteschleife halten
+    if (fastestFee > 0 && fastestFee <= 5) {
+      if (loopNow - timerBlueAlarm >= 500) {
+        timerBlueAlarm = loopNow;
+        stateAlarm = !stateAlarm;
+        digitalWrite(LED_RED, stateAlarm ? HIGH : LOW);
+      }
+    } else {
+      digitalWrite(LED_RED, HIGH);
+    }
+    
     delay(10); 
   }
 }
