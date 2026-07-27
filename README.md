@@ -38,6 +38,9 @@ Ultraminimale Standalone-Version ohne SD-Kartenleser für den Schreibtisch (SDA:
 
 Ein ultrakompakter, autonomer Bitcoin- und Mempool-Ticker, verpackt in einem kunstvoll handgelöteten Messing-Drahtskelett. Das Projekt basiert auf dem **ESP32-C3 SuperMini** und visualisiert Live-Blockchain-Daten auf einem winzigen 0,49" OLED-Display, begleitet von drei unabhängig voneinander blinkenden Status-LEDs.
 
+![Vorschau des Bitcoin Tickers](./ESP32-C3-Satellite/ESP32-C3-Satellite-Block.png)
+
+
 ## ✨ Features
 
 - **Ultrakompaktes UI:** Pixelgenaue Anpassung an ein Hailege 0,49" OLED-Display (64x32 Pixel) unter Verwendung der ressourcenschonenden `SSD1306Wire`-Bibliothek.
