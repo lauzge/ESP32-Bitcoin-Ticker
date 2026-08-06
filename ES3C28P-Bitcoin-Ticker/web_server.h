@@ -1,6 +1,7 @@
 #pragma once
 #include <ESPAsyncWebServer.h>
 #include <Preferences.h>
+#include <WiFi.h> // WICHTIG: Fuer den direkten Zugriff auf den Hardware-WLAN-Speicher
 #include "config.h"
 #include "api_calculator.h"
 
@@ -43,8 +44,14 @@ void initWebServer() {
     });
 
     server.on("/reset_wifi", HTTP_POST, [](AsyncWebServerRequest *request){
+        // KORREKTUR: Loescht erst unsere Preferences und radiert danach die echten Hardware-WLAN-Daten aus dem NVS-Flash!
         preferences.begin("wifi_cfg", false); preferences.clear(); preferences.end();
-        request->send(200, "text/html", "<h3>WLAN geloescht! Neustart...</h3>");
-        delay(2000); ESP.restart();
+        
+        // Parameter 1: Verbindung kappen | Parameter 2: Gespeicherte Router-Daten aus dem Flash restlos entfernen
+        WiFi.disconnect(true, true); 
+        
+        request->send(200, "text/html", "<h3>WLAN restlos geloescht! ESP32-S3 startet neu im AP-Modus...</h3>");
+        delay(2000); 
+        ESP.restart();
     });
 }

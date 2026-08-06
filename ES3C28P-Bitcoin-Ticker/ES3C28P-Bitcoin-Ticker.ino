@@ -21,7 +21,7 @@ const long interval = 45000;
 void setup() {
     Serial.begin(115200);
     delay(500);
-    Serial.println("\n--- Blocktrainer Terminal startet ---");
+    Serial.println("\n--- Bitcoin Terminal startet ---");
     const int BUTTON_PIN = 0; pinMode(BUTTON_PIN, INPUT_PULLUP);
 
     initLVGL();

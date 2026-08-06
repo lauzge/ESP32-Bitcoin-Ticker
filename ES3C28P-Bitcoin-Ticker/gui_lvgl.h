@@ -76,10 +76,12 @@ lv_obj_t * calc_lbl_sats = NULL;
 lv_obj_t * calc_lbl_eur = NULL;
 lv_obj_t * calc_lbl_usd = NULL;
 
-// NEU: Native LVGL 9 Chart-Komponenten gegen das unschöne Blinken
-lv_obj_t * chart_line_obj = NULL;
+// REPARIERT: Echtes LVGL 9 Chart-Objekt mitsamt Datenreihe deklariert
+lv_obj_t * chart_obj = NULL;
+lv_chart_series_t * chart_series = NULL;
 lv_obj_t * chart_max_price_lbl = NULL;
 lv_obj_t * chart_min_price_lbl = NULL;
+
 void my_disp_flush(lv_display_t * disp, const lv_area_t * area, uint8_t * px_map) {
     uint32_t w = (area->x2 - area->x1 + 1);
     uint32_t h = (area->y2 - area->y1 + 1);
@@ -225,6 +227,7 @@ void initLVGL() {
     lv_obj_add_flag(chart_top_date_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(chart_top_price_label, LV_OBJ_FLAG_HIDDEN);
 }
+
 void updateGUI() {
     lv_tick_inc(5); 
 
@@ -568,20 +571,20 @@ void updateGUI() {
         lv_label_set_text(bottom_date_label, shortDate.c_str());
     }
 
-    // Wenn wir nicht auf der Chartseite sind, natives Chart-Objekt unsichtbar machen
-    if(sysConfig.currentSide != 4 && chart_line_obj != NULL) {
-        lv_obj_add_flag(chart_line_obj, LV_OBJ_FLAG_HIDDEN);
+    // Wenn wir die Chartseite verlassen, verstecken wir das native LVGL-Chart komplett
+    if(sysConfig.currentSide != 4 && chart_obj != NULL) {
+        lv_obj_add_flag(chart_obj, LV_OBJ_FLAG_HIDDEN);
         if(chart_max_price_lbl) lv_obj_add_flag(chart_max_price_lbl, LV_OBJ_FLAG_HIDDEN);
         if(chart_min_price_lbl) lv_obj_add_flag(chart_min_price_lbl, LV_OBJ_FLAG_HIDDEN);
     }
 
     lv_timer_handler();
     
-    // REPARIERT: Live-Chart komplett auf nativen, flackerfreien LVGL 9 Code umgestellt!
+    // REPARIERT: Live-Chart mitsamt Raster komplett auf flackerfreie LVGL 9 Engine migriert
     if(sysConfig.currentSide == 4) {
         static unsigned long lastChartRender = 0;
         
-        if (millis() - lastChartRender > 2000 || chart_line_obj == NULL) {
+        if (millis() - lastChartRender > 2000 || chart_obj == NULL) {
             lastChartRender = millis();
             
             long* activeHistory = btc.history24h; int activeCount = btc.count24h; 
@@ -596,47 +599,62 @@ void updateGUI() {
                 }
                 if(maxPrice == minPrice) { maxPrice += 10; minPrice -= 10; }
 
-                // Statisches Array fuer exakt 24 Koordinaten-Punkte erzeugen
-                static lv_point_precise_t line_points[24];
-                int cMinX = 20, cMaxX = 250, cMinY = 60, cMaxY = 210;
+                int cMinY = 55, cMaxY = 210;
 
-                for(int i = 0; i < activeCount; i++) {
-                    line_points[i].x = cMinX + (i * (cMaxX - cMinX) / 23);
-                    line_points[i].y = cMaxY - ((activeHistory[i] - minPrice) * (cMaxY - cMinY) / (maxPrice - minPrice));
-                }
-
-                // Natives LVGL Linienobjekt erstellen oder aktualisieren
-                if(chart_line_obj == NULL) {
+                // Initialisiert das native Chart-Widget beim allerersten Aufruf
+                if(chart_obj == NULL) {
                     lv_obj_t * scr = lv_screen_active();
-                    chart_line_obj = lv_line_create(scr);
-                    lv_obj_set_style_line_color(chart_line_obj, lv_color_hex(0xD3D3D3), 0); // Hellgrau
-                    lv_obj_set_style_line_width(chart_line_obj, 2, 0);
+                    
+                    chart_obj = lv_chart_create(scr);
+                    lv_obj_set_size(chart_obj, 240, 155);
+                    lv_obj_align(chart_obj, LV_ALIGN_TOP_LEFT, 15, cMinY);
+                    lv_chart_set_type(chart_obj, LV_CHART_TYPE_LINE);
+                    
+                    // Sauberes, dezentes Hintergrund-Gitter (Raster) definieren
+                    lv_chart_set_div_line_count(chart_obj, 5, 6); // 5 horizontale, 6 vertikale Linien
+                    lv_obj_set_style_line_color(chart_obj, lv_color_hex(0x1a1a1a), LV_PART_ITEMS); // Dunkelgraues Raster
+                    lv_obj_set_style_bg_color(chart_obj, lv_color_hex(0x000000), 0); // Schwarzer Chart-Hintergrund
+                    lv_obj_set_style_border_width(chart_obj, 0, 0);
+                    
+                    // Datenreihe anlegen (Hellgraue Kurslinie)
+                    chart_series = lv_chart_add_series(chart_obj, lv_color_hex(0xD3D3D3), LV_CHART_AXIS_PRIMARY_Y);
+                    lv_chart_set_point_count(chart_obj, 24);
 
+                    // Min/Max Preislabels rechts platzieren
                     chart_max_price_lbl = lv_label_create(scr);
-                    lv_obj_set_style_text_color(chart_max_price_lbl, lv_color_hex(0x666666), 0);
+                    lv_obj_set_style_text_color(chart_max_price_lbl, lv_color_hex(0x555555), 0);
                     lv_obj_set_style_text_font(chart_max_price_lbl, &lv_font_montserrat_10, 0);
-                    lv_obj_align(chart_max_price_lbl, LV_ALIGN_TOP_RIGHT, -10, cMinY);
+                    lv_obj_align(chart_max_price_lbl, LV_ALIGN_TOP_RIGHT, -5, cMinY);
 
                     chart_min_price_lbl = lv_label_create(scr);
-                    lv_obj_set_style_text_color(chart_min_price_lbl, lv_color_hex(0x666666), 0);
+                    lv_obj_set_style_text_color(chart_min_price_lbl, lv_color_hex(0x555555), 0);
                     lv_obj_set_style_text_font(chart_min_price_lbl, &lv_font_montserrat_10, 0);
-                    lv_obj_align(chart_min_price_lbl, LV_ALIGN_TOP_RIGHT, -10, cMaxY - 10);
+                    lv_obj_align(chart_min_price_lbl, LV_ALIGN_TOP_RIGHT, -5, cMaxY - 10);
                 }
 
-                // Sichtbarkeit erzwingen
-                lv_obj_remove_flag(chart_line_obj, LV_OBJ_FLAG_HIDDEN);
+                // Sichtbarkeit einschalten
+                lv_obj_remove_flag(chart_obj, LV_OBJ_FLAG_HIDDEN);
                 lv_obj_remove_flag(chart_max_price_lbl, LV_OBJ_FLAG_HIDDEN);
                 lv_obj_remove_flag(chart_min_price_lbl, LV_OBJ_FLAG_HIDDEN);
 
-                // Daten in das LVGL-Linienfeld einspeisen
-                lv_line_set_points(chart_line_obj, line_points, activeCount);
+                // Dynamischen Y-Achsenbereich an die aktuellen Min/Max Kurse anpassen
+                lv_chart_set_range(chart_obj, LV_CHART_AXIS_PRIMARY_Y, minPrice, maxPrice);
+                // Array-Werte sequentiell in das native LVGL-Chart schieben
+                for(int i = 0; i < 24; i++) {
+                    if (i < activeCount) {
+                        lv_chart_set_next_value(chart_obj, chart_series, activeHistory[i]);
+                    } else {
+                        lv_chart_set_next_value(chart_obj, chart_series, activeHistory[activeCount - 1]);
+                    }
+                }
                 lv_label_set_text(chart_max_price_lbl, String(maxPrice).c_str());
                 lv_label_set_text(chart_min_price_lbl, String(minPrice).c_str());
+                lv_chart_refresh(chart_obj); // Chart-Zeichnung flackerfrei aktualisieren
             }
         }
     }
-} 
+}
 
 void triggerScreenClear() {
-    lcd.fillScreen(0x000000); 
+    lcd.fillScreen(0x000000);
 }
