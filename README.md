@@ -46,7 +46,7 @@ Premium-Desktop-Ausführung optimiert für das **2,8" IPS-Touch-Display (ES3C28P
 *   **Besonderheit:** Läuft auf der hochperformanten **LVGL 9 Grafik-Engine** gekoppelt mit LovyanGFX. Beinhaltet ein lokales Web-Interface zur Konfiguration des automatischen Seitenwechsels (Auto-Rotate) und der Chart-Intervalle.
 *   **Interaktiver Satoshi-Rechner:** Über ein Wischen auf Seite 5 öffnet sich ein voll nativer, klicksicherer Dreisatz-Rechner mit Touch-Tastatur, Zeilen-Selektoren (Sats/EUR/USD) und Live-Daten-Einspeisung. Schützt den Workflow durch automatische Rotations-Sperre auf der Rechner-Seite.
 
-![Vorschau des Bitcoin Terminals](./ESP32-2.8inch-TouchScreen-Bitcoin-Ticker/ES3C28P-Bitcoin-Ticker-Block.png)
+![Vorschau des Bitcoin Terminals](./ES3C28P-Bitcoin-Ticker/ES3C28P-Bitcoin-Ticker-Block.png)
 
 
 ## ✨ Features
